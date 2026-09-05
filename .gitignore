@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# logs and caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.turbo/
+*.tsbuildinfo
+
+# tooling / OS
+.DS_Store
+*.pem
+.idea/
+.vscode/
+.vercel
+coverage/

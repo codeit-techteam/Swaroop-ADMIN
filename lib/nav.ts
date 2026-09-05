@@ -1,0 +1,100 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  ClipboardCheck,
+  CreditCard,
+  Factory,
+  FileText,
+  Handshake,
+  LayoutDashboard,
+  PackageSearch,
+  Scale,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  ShoppingCart,
+  Truck,
+  Users,
+  Wallet,
+  FileSearch,
+  PieChart,
+} from "lucide-react";
+
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+export interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+export const adminNav: NavSection[] = [
+  {
+    label: "CORE",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/procurement", label: "Procurement Workbench", icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: "ECOSYSTEM",
+    items: [
+      { href: "/customers", label: "Customers", icon: Building2 },
+      { href: "/sellers", label: "Sellers", icon: Factory },
+      { href: "/users", label: "Users", icon: Users },
+      { href: "/kyc", label: "KYC", icon: ShieldCheck },
+      { href: "/catalog", label: "Catalog", icon: PackageSearch },
+    ],
+  },
+  {
+    label: "COMMERCE",
+    items: [
+      { href: "/orders", label: "Orders", icon: ShoppingCart },
+      { href: "/offers", label: "Offers", icon: Handshake },
+    ],
+  },
+  {
+    label: "FINANCE",
+    items: [
+      { href: "/payments", label: "Payments", icon: CreditCard },
+      { href: "/credit-insurance", label: "Credit Insurance", icon: ShieldAlert },
+      { href: "/receivables", label: "Receivables", icon: Wallet },
+    ],
+  },
+  {
+    label: "OPERATIONS",
+    items: [
+      { href: "/logistics", label: "Logistics", icon: Truck },
+      { href: "/disputes", label: "Disputes", icon: Scale },
+    ],
+  },
+  {
+    label: "INSIGHTS",
+    items: [
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/reports", label: "Reports", icon: PieChart },
+    ],
+  },
+  {
+    label: "SYSTEM",
+    items: [
+      { href: "/notifications", label: "Notifications", icon: Bell },
+      { href: "/documents", label: "Documents", icon: FileText },
+      { href: "/audit-logs", label: "Audit Logs", icon: FileSearch },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+];
+
+export function isNavActive(pathname: string, href: string) {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  if (href === "/procurement") {
+    return pathname === "/procurement" || pathname.startsWith("/procurement/");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
