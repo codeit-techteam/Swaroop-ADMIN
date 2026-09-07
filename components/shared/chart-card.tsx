@@ -4,19 +4,24 @@ import { cn } from "@/lib/utils";
 
 export function ChartCard({
   title,
+  description,
   action,
   children,
   className,
 }: {
   title: string;
+  description?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <section className={cn("rounded-md border bg-white p-4 shadow-soft", className)}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+        </div>
         {action}
       </div>
       {children}

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
-import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
@@ -33,30 +32,21 @@ export default function UsersPage() {
           { key: "name", header: "Name", sortable: true, accessor: (r) => r.name },
           { key: "email", header: "Email", accessor: (r) => r.email },
           { key: "role", header: "Role", accessor: (r) => r.role },
-          { key: "source", header: "Source", render: (r) => <SourceBadge source={r.source} /> },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
           { key: "last", header: "Last Active", sortable: true, accessor: (r) => r.lastActive, render: (r) => formatDate(r.lastActive) },
           { key: "created", header: "Created", sortable: true, accessor: (r) => r.createdAt, render: (r) => formatDate(r.createdAt) },
         ]}
         searchPlaceholder="Search users"
-        searchFn={(r, q) => `${r.id} ${r.name} ${r.email} ${r.role} ${r.source}`.toLowerCase().includes(q)}
-        filters={[
-          { label: "Customer App", value: "Customer App", predicate: (r) => r.source === "Customer App" },
-          { label: "Customer Web", value: "Customer Web", predicate: (r) => r.source === "Customer Web" },
-          { label: "Seller App", value: "Seller App", predicate: (r) => r.source === "Seller App" },
-          { label: "Seller Web", value: "Seller Web", predicate: (r) => r.source === "Seller Web" },
-          { label: "Admin Portal", value: "Admin Portal", predicate: (r) => r.source === "Admin Portal" },
-        ]}
+        searchFn={(r, q) => `${r.id} ${r.name} ${r.email} ${r.role}`.toLowerCase().includes(q)}
         emptyTitle="No users found."
         emptyDescription="Users from all five PetroTrade applications appear here."
         exportName="users"
-        exportRow={(r) => ({ id: r.id, name: r.name, role: r.role, source: r.source, status: r.status })}
+        exportRow={(r) => ({ id: r.id, name: r.name, role: r.role, status: r.status })}
         drawerTitle={(r) => r.name}
         renderDetails={(r) => (
           <dl>
             <DetailRow label="Email" value={r.email} />
             <DetailRow label="Role" value={r.role} />
-            <DetailRow label="Source" value={<SourceBadge source={r.source} />} />
             <DetailRow label="Status" value={<StatusBadge value={r.status} />} />
           </dl>
         )}

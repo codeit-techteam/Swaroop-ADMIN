@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/shared/states";
@@ -42,7 +42,7 @@ export function DataTable<T>({
   onRowClick,
   emptyTitle = "No records found",
   emptyDescription = "Try changing your filters.",
-  pageSize = 8,
+  pageSize = 5,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -62,8 +62,19 @@ export function DataTable<T>({
   }, [rows, sortKey, sortDir, columns]);
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, pageCount - 1);
+  const safePage = Math.min(Math.max(0, page), pageCount - 1);
   const pageRows = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const canPrev = safePage > 0;
+  const canNext = safePage < pageCount - 1;
+  const rowIds = rows.map(getRowId).join("|");
+
+  useEffect(() => {
+    setPage(0);
+  }, [rowIds, pageSize]);
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
 
   if (rows.length === 0) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
@@ -127,8 +138,8 @@ export function DataTable<T>({
             type="button"
             size="sm"
             variant="outline"
-            disabled={safePage === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={!canPrev}
+            onClick={() => setPage(safePage - 1)}
           >
             Previous
           </Button>
@@ -136,8 +147,8 @@ export function DataTable<T>({
             type="button"
             size="sm"
             variant="outline"
-            disabled={safePage >= pageCount - 1}
-            onClick={() => setPage((p) => p + 1)}
+            disabled={!canNext}
+            onClick={() => setPage(safePage + 1)}
           >
             Next
           </Button>

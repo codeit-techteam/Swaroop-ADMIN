@@ -1,3 +1,4 @@
+export { banners, mediaAssets } from "./banners";
 export { customers } from "./customers";
 export { sellers } from "./sellers";
 export { users } from "./users";
@@ -18,6 +19,7 @@ export {
 } from "./finance-ops";
 export {
   revenueSeries,
+  creditRiskExposure,
   categoryDistribution,
   regionalDistribution,
   buyerGrowth,

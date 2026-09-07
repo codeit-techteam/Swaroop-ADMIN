@@ -8,6 +8,33 @@ export const revenueSeries = [
   { label: "Today", revenue: 61, orders: 318, gmv: 82 },
 ];
 
+export const creditRiskExposure = [
+  {
+    name: "Low",
+    label: "Low risk",
+    value: 75,
+    amount: 18_000_000,
+    color: "#059669",
+    hint: "Performing accounts",
+  },
+  {
+    name: "Medium",
+    label: "Medium risk",
+    value: 15,
+    amount: 3_600_000,
+    color: "#D97706",
+    hint: "Watch closely",
+  },
+  {
+    name: "High",
+    label: "High risk",
+    value: 10,
+    amount: 2_400_000,
+    color: "#DC2626",
+    hint: "Needs action",
+  },
+];
+
 export const categoryDistribution = [
   { name: "PP", value: 34 },
   { name: "PVC", value: 22 },

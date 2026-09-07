@@ -19,7 +19,7 @@ import {
   Users,
   Wallet,
   FileSearch,
-  PieChart,
+  ImageIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -75,10 +75,11 @@ export const adminNav: NavSection[] = [
   },
   {
     label: "INSIGHTS",
-    items: [
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-      { href: "/reports", label: "Reports", icon: PieChart },
-    ],
+    items: [{ href: "/analytics", label: "Analytics", icon: BarChart3 }],
+  },
+  {
+    label: "CONTENT MANAGEMENT",
+    items: [{ href: "/content/banners", label: "Banner Management", icon: ImageIcon }],
   },
   {
     label: "SYSTEM",

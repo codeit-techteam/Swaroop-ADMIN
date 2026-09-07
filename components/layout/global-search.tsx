@@ -24,6 +24,7 @@ const GROUPS: SearchHit["group"][] = [
   "Products",
   "Purchase Requests",
   "Offers",
+  "Banners",
 ];
 
 export function GlobalSearch() {
@@ -50,11 +51,11 @@ export function GlobalSearch() {
       <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
         <DialogTitle className="sr-only">Global search</DialogTitle>
         <DialogDescription className="sr-only">
-          Search orders, clients, sellers, shipments and catalog grades.
+          Search banners, orders, clients, sellers, shipments and catalog grades.
         </DialogDescription>
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search orders, clients, sellers, shipments..."
+            placeholder="Search banners, orders, clients, sellers..."
             value={query}
             onValueChange={setQuery}
           />

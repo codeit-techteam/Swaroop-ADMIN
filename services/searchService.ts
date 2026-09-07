@@ -1,3 +1,4 @@
+import { useBannerStore } from "@/store/banner-store";
 import { useDataStore } from "@/store/data-store";
 import { useProcurementStore } from "@/store/procurement-store";
 
@@ -11,7 +12,8 @@ export interface SearchHit {
     | "Shipments"
     | "Products"
     | "Purchase Requests"
-    | "Offers";
+    | "Offers"
+    | "Banners";
   title: string;
   subtitle: string;
   href: string;
@@ -112,6 +114,18 @@ export function searchPlatform(query: string): SearchHit[] {
         title: item.id,
         subtitle: `${item.seller} · ${item.grade}`,
         href: `/offers?id=${item.id}`,
+      });
+    }
+  }
+  for (const item of useBannerStore.getState().banners) {
+    const haystack = `${item.name} ${item.campaignName} ${item.headline} ${item.platforms.join(" ")} ${item.placements.join(" ")}`;
+    if (haystack.toLowerCase().includes(q)) {
+      hits.push({
+        id: item.id,
+        group: "Banners",
+        title: item.name,
+        subtitle: `${item.campaignName} · ${item.platforms.join(", ")}`,
+        href: "/content/banners",
       });
     }
   }

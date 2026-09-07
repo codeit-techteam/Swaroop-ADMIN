@@ -362,7 +362,7 @@ export interface PurchaseRequest {
 
 export interface NotificationItem {
   id: string;
-  type: "KYC" | "Order" | "Payment" | "Dispatch" | "Dispute" | "Seller" | "Customer" | "System" | "Procurement";
+  type: "KYC" | "Order" | "Payment" | "Dispatch" | "Dispute" | "Seller" | "Customer" | "System" | "Procurement" | "Content";
   title: string;
   body: string;
   createdAt: string;

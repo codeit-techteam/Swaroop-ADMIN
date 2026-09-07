@@ -11,43 +11,27 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { toast } from "sonner";
 
 import { ActivityTimeline } from "@/components/shared/activity-timeline";
+import { CmsOverview } from "@/components/content/cms-overview";
 import { ChartCard } from "@/components/shared/chart-card";
+import { CreditRiskChart } from "@/components/shared/charts/credit-risk-chart";
+import { RevenueGrowthChart } from "@/components/shared/charts/revenue-growth-chart";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { downloadCsv } from "@/lib/csv";
-import { greetingForNow } from "@/lib/format";
-import {
-  ecosystemOverview,
-  platformHealth,
-  revenueSeries,
-} from "@/lib/mock-data";
+import { formatInr, greetingForNow } from "@/lib/format";
+import { creditRiskExposure, revenueSeries } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 import { useProcurementStore } from "@/store/procurement-store";
 
 const RANGES = ["7 Days", "30 Days", "90 Days"] as const;
-const PIE = [
-  { name: "Low Risk", value: 75, color: "#059669" },
-  { name: "Medium Risk", value: 15, color: "#D97706" },
-  { name: "High Risk", value: 10, color: "#DC2626" },
-];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -63,8 +47,45 @@ export default function DashboardPage() {
 
   const pendingKyc = kyc.filter((item) => item.status === "Pending" || item.status === "Under Review").length;
   const pendingPayments = payments.filter((item) => item.status === "Pending" || item.status === "Processing").length;
-  const delayed = shipments.filter((item) => item.status === "Delayed").length;
-  const openDisputes = disputes.filter((item) => item.status !== "Resolved" && item.status !== "Rejected").length;
+  const delayedShipments = shipments.filter((item) => item.status === "Delayed");
+  const delayed = delayedShipments.length;
+  const openDisputes = disputes.filter((item) => item.status !== "Resolved" && item.status !== "Rejected");
+  const criticalDisputes = openDisputes.filter((item) => item.priority === "Critical");
+
+  const criticalAlerts = [
+    ...delayedShipments.map((item) => ({
+      id: item.id,
+      tone: "critical" as const,
+      href: "/logistics",
+      message: `Delayed ${item.grade} parcel ${item.id} is holding order ${item.orderId}.`,
+    })),
+    ...criticalDisputes.map((item) => ({
+      id: item.id,
+      tone: "critical" as const,
+      href: "/disputes",
+      message: `Critical dispute ${item.id} on ${item.orderId} — ${formatInr(item.amount)} (${item.customer}).`,
+    })),
+    ...(pendingKyc
+      ? [
+          {
+            id: "kyc",
+            tone: "warning" as const,
+            href: "/kyc",
+            message: `${pendingKyc} KYC packs still require reviewer action.`,
+          },
+        ]
+      : []),
+    ...(pendingPayments
+      ? [
+          {
+            id: "payments",
+            tone: "warning" as const,
+            href: "/payments",
+            message: `${pendingPayments} payments are pending or processing.`,
+          },
+        ]
+      : []),
+  ];
 
   const activity = [
     { id: "a1", title: "Order #PT-9021 Placed", detail: "PP RAFFIA · Apex Polymers", time: "2026-09-05T07:18:00+05:30", source: "Customer Web" as const },
@@ -111,6 +132,39 @@ export default function DashboardPage() {
       <p className="text-sm text-muted-foreground">
         {greetingForNow()}, {user?.name ?? "Admin"}
       </p>
+      <section className="rounded-md border border-red-200 bg-white p-4 shadow-soft">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-red-700" />
+            <p className="section-label !text-red-700">Critical Alerts</p>
+          </div>
+          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+            {criticalAlerts.length} requiring action
+          </span>
+        </div>
+        {criticalAlerts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No critical alerts right now.</p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {criticalAlerts.map((alert) => (
+              <button
+                key={alert.id}
+                type="button"
+                onClick={() => router.push(alert.href)}
+                className={cn(
+                  "flex items-start gap-2 rounded-md border p-3 text-left text-sm transition hover:shadow-soft",
+                  alert.tone === "critical"
+                    ? "border-red-200 bg-red-50 text-red-800 hover:border-red-300"
+                    : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300",
+                )}
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <span>{alert.message}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total Buyers" value="1,284" icon={Building2} href="/customers" />
         <KpiCard label="Total Sellers" value="452" icon={Factory} href="/sellers" />
@@ -123,33 +177,11 @@ export default function DashboardPage() {
           <KpiCard label="Pending KYC" value={String(pendingKyc)} href="/kyc" tone="warning" />
           <KpiCard label="Pending Payments" value={String(pendingPayments)} href="/payments" tone="warning" />
           <KpiCard label="Pending Dispatch" value="8" href="/logistics" tone="warning" />
-          <KpiCard label="Open Disputes" value={String(openDisputes)} href="/disputes" tone="danger" />
+          <KpiCard label="Open Disputes" value={String(openDisputes.length)} href="/disputes" tone="danger" />
           <KpiCard label="Delayed Deliveries" value={String(delayed)} href="/logistics" tone="danger" />
         </div>
       </section>
-      <section className="rounded-md border bg-white p-4 shadow-soft">
-        <p className="section-label mb-3">Ecosystem Overview</p>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {ecosystemOverview.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => router.push(item.href)}
-              className="rounded-md border p-3 text-left hover:border-primary/40"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">{item.name}</p>
-                <StatusBadge value={item.status} />
-              </div>
-              <p className="mt-3 text-xl font-semibold">{item.metric.toLocaleString("en-IN")}</p>
-              <p className="text-xs text-muted-foreground">{item.metricLabel}</p>
-              <p className="mt-2 text-xs">
-                {item.secondaryLabel}: <span className="font-medium">{item.secondary}</span>
-              </p>
-            </button>
-          ))}
-        </div>
-      </section>
+      <CmsOverview />
       <div className="grid gap-4 xl:grid-cols-3">
         <ChartCard title="Credit Exposure">
           <div className="grid gap-3">
@@ -165,38 +197,20 @@ export default function DashboardPage() {
             Open payments
           </Button>
         </ChartCard>
-        <ChartCard title="Credit Risk Exposure">
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={PIE} dataKey="value" nameKey="name" innerRadius={38} outerRadius={58}>
-                  {PIE.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span>Low 75%</span>
-            <span>Medium 15%</span>
-            <span>High 10%</span>
-          </div>
+        <ChartCard
+          title="Credit Risk Exposure"
+          description="Outstanding credit split by risk band"
+        >
+          <CreditRiskChart data={creditRiskExposure} />
         </ChartCard>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
-        <ChartCard title="Revenue Growth" className="xl:col-span-2">
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueSeries}>
-                <XAxis dataKey="label" fontSize={11} />
-                <YAxis fontSize={11} />
-                <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#2563EB" fill="#DBEAFE" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <ChartCard
+          title="Revenue Growth"
+          description="Daily revenue in ₹ lakh · last 30 days"
+          className="xl:col-span-2"
+        >
+          <RevenueGrowthChart data={revenueSeries} />
         </ChartCard>
         <ChartCard title="Activity Feed">
           <ActivityTimeline key={tick} items={activity} />
@@ -244,28 +258,6 @@ export default function DashboardPage() {
               </li>
             ))}
           </ul>
-        </ChartCard>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Critical Alerts">
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            <AlertTriangle className="mt-0.5 size-4" />
-            Delayed Brent parcel SHP-4370 is holding a ₹2.4 Cr order in dispute.
-          </div>
-          <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <AlertTriangle className="mt-0.5 size-4" />
-            {pendingKyc} KYC packs still require reviewer action.
-          </div>
-        </ChartCard>
-        <ChartCard title="Platform Health">
-          <div className="grid grid-cols-2 gap-2">
-            {platformHealth.map((item) => (
-              <div key={item.name} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                <span>{item.name}</span>
-                <StatusBadge value={item.status} />
-              </div>
-            ))}
-          </div>
         </ChartCard>
       </div>
     </div>

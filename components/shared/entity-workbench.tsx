@@ -38,6 +38,7 @@ interface EntityWorkbenchProps<T> {
   exportRow: (row: T) => Record<string, string | number | boolean | null | undefined>;
   initialSelectedId?: string | null;
   actions?: ReactNode;
+  pageSize?: number;
 }
 
 export function EntityWorkbench<T>({
@@ -61,6 +62,7 @@ export function EntityWorkbench<T>({
   exportRow,
   initialSelectedId,
   actions,
+  pageSize = 5,
 }: EntityWorkbenchProps<T>) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -152,6 +154,7 @@ export function EntityWorkbench<T>({
         onRowClick={(row) => setSelectedId(getRowId(row))}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+        pageSize={pageSize}
       />
       <DetailDrawer
         open={Boolean(selected)}

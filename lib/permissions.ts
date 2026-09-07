@@ -26,7 +26,7 @@ const ALL_ROUTES = [
   "/logistics",
   "/disputes",
   "/analytics",
-  "/reports",
+  "/content",
   "/notifications",
   "/documents",
   "/audit-logs",
@@ -85,7 +85,7 @@ export function canAccessRoute(role: AdminRole, pathname: string) {
 
 export function permissionLabels(role: AdminRole) {
   const map: Record<AdminRole, string[]> = {
-    SUPER_ADMIN: ["Full platform control", "User & role administration", "Finance overrides", "Audit access"],
+    SUPER_ADMIN: ["Full platform control", "User & role administration", "Finance overrides", "Audit access", "Content management"],
     ADMIN: ["Operational control", "KYC & offers review", "Order management", "Analytics"],
     OPERATIONS: ["Orders", "Procurement", "Logistics", "Disputes"],
     PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog"],

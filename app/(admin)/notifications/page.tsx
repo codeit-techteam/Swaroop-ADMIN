@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/states";
 
-const TYPES = ["All", "KYC", "Order", "Payment", "Dispatch", "Dispute", "Seller", "Customer", "Procurement", "System"] as const;
+const TYPES = ["All", "KYC", "Order", "Payment", "Dispatch", "Dispute", "Seller", "Customer", "Procurement", "Content", "System"] as const;
 
 export default function NotificationsPage() {
   const router = useRouter();

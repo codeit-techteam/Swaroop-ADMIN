@@ -39,6 +39,8 @@ export const notifications: NotificationItem[] = [
   { id: "NTF-12", type: "Procurement", title: "Seller confirmation received", body: "Hygain Commodities accepted PO-8804-G2.", createdAt: "2026-09-05T08:00:00+05:30", read: true, href: "/procurement?id=PO-8804-G2", source: "Seller Web" },
   { id: "NTF-13", type: "Procurement", title: "PO created", body: "PO-8808-F1 issued to Oriental Polymers.", createdAt: "2026-09-04T13:10:00+05:30", read: true, href: "/procurement?id=PO-8808-F1", source: "Admin Portal" },
   { id: "NTF-14", type: "Dispatch", title: "Dispatch delayed", body: "SHP-4370 Brent parcel is on hold at depot.", createdAt: "2026-09-04T16:00:00+05:30", read: false, href: "/logistics?id=SHP-4370", source: "Admin Portal" },
+  { id: "NTF-15", type: "Content", title: "Diwali Fuel Offer scheduled", body: "Festival campaign is scheduled for 01 Oct 2026.", createdAt: "2026-09-05T18:40:00+05:30", read: false, href: "/content/banners", source: "Admin Portal" },
+  { id: "NTF-16", type: "Content", title: "3 banners are scheduled this week", body: "Bulk Order Savings, Dispatch SLA and Diwali Fuel Offer.", createdAt: "2026-09-06T09:00:00+05:30", read: true, href: "/content/banners", source: "Admin Portal" },
 ];
 
 export const documents: PlatformDocument[] = [
@@ -60,4 +62,6 @@ export const auditLogs: AuditLog[] = [
   { id: "AUD-4", timestamp: "2026-09-04T12:40:00+05:30", admin: "Amit Desai", role: "FINANCE", action: "Changed order PT-8966 to Ready for Dispatch", module: "Orders", entity: "PT-8966", result: "Success", source: "Admin Portal" },
   { id: "AUD-5", timestamp: "2026-08-27T09:40:00+05:30", admin: "Admin User", role: "SUPER_ADMIN", action: "Assigned dispute DSP-191", module: "Disputes", entity: "DSP-191", result: "Success", source: "Admin Portal" },
   { id: "AUD-6", timestamp: "2026-08-20T09:40:00+05:30", admin: "Amit Desai", role: "FINANCE", action: "Rejected KYC for Northline Chemicals", module: "KYC", entity: "KYC-833", result: "Success", source: "Admin Portal" },
+  { id: "AUD-7", timestamp: "2026-09-05T18:40:00+05:30", admin: "Admin User", role: "SUPER_ADMIN", action: "Admin created banner Diwali Fuel Offer", module: "Content", entity: "BNR-1006", result: "Success", source: "Admin Portal" },
+  { id: "AUD-8", timestamp: "2026-09-06T17:00:00+05:30", admin: "Amit Desai", role: "FINANCE", action: "Admin paused banner Settlement Reminder", module: "Content", entity: "BNR-1008", result: "Success", source: "Admin Portal" },
 ];
