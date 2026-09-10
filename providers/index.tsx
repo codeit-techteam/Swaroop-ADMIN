@@ -1,15 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { Toaster } from "@/components/ui/sonner";
 import { useAuthStore } from "@/store/auth-store";
-import { useEffect } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const finish = () => useAuthStore.getState().setHydrated();
+    const finish = () => useAuthStore.getState().finishHydration();
     const unsub = useAuthStore.persist.onFinishHydration(finish);
-    if (useAuthStore.persist.hasHydrated()) finish();
-    return unsub;
+    void useAuthStore.persist.rehydrate();
+    const timer = window.setTimeout(finish, 250);
+    return () => {
+      unsub();
+      window.clearTimeout(timer);
+    };
   }, []);
 
   return (

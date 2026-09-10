@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 import { DEMO_CREDENTIALS } from "@/lib/constants";
 import { permissionLabels } from "@/lib/permissions";
-import { clearSessionCookie, setSessionCookie } from "@/lib/session";
+import { clearSessionCookie, hasSessionCookie, setSessionCookie } from "@/lib/session";
 import type { AdminRole, AdminUser } from "@/types";
 
 interface AuthState {
@@ -15,6 +15,7 @@ interface AuthState {
   demoLogin: (role?: AdminRole) => void;
   logout: () => void;
   setHydrated: () => void;
+  finishHydration: () => void;
 }
 
 const demoUser = (role: AdminRole = "SUPER_ADMIN"): AdminUser => ({
@@ -30,7 +31,7 @@ const demoUser = (role: AdminRole = "SUPER_ADMIN"): AdminUser => ({
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       hydrated: false,
       login: async (email, password) => {
@@ -41,7 +42,7 @@ export const useAuthStore = create<AuthState>()(
         ) {
           const user = demoUser("SUPER_ADMIN");
           setSessionCookie();
-          set({ user });
+          set({ user, hydrated: true });
           return { ok: true };
         }
         return { ok: false, error: "Invalid corporate email or password." };
@@ -49,21 +50,28 @@ export const useAuthStore = create<AuthState>()(
       demoLogin: (role = "SUPER_ADMIN") => {
         const user = demoUser(role);
         setSessionCookie();
-        set({ user });
+        set({ user, hydrated: true });
       },
       logout: () => {
         clearSessionCookie();
-        set({ user: null });
+        set({ user: null, hydrated: true });
       },
       setHydrated: () => set({ hydrated: true }),
+      finishHydration: () => {
+        if (get().hydrated && get().user) return;
+        if (!get().user && hasSessionCookie()) {
+          set({ user: demoUser("SUPER_ADMIN"), hydrated: true });
+          setSessionCookie();
+          return;
+        }
+        if (!get().user) clearSessionCookie();
+        set({ hydrated: true });
+      },
     }),
     {
       name: "pt-admin-auth",
+      skipHydration: true,
       partialize: (state) => ({ user: state.user }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated();
-        if (state?.user) setSessionCookie();
-      },
     },
   ),
 );

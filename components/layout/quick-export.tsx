@@ -12,9 +12,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { downloadCsv } from "@/lib/csv";
+import { gradeExportRows } from "@/lib/grade-utils";
 import { applyFilters, toExportRow } from "@/lib/procurement";
+import { audienceLabel, CATEGORY_LABELS, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/push-notification-utils";
 import { useDataStore } from "@/store/data-store";
+import { useGradeStore } from "@/store/grade-store";
 import { useProcurementStore } from "@/store/procurement-store";
+import { usePushNotificationStore } from "@/store/push-notification-store";
 import { useUiStore } from "@/store/ui-store";
 
 const EXPORTS = [
@@ -24,6 +28,8 @@ const EXPORTS = [
   { key: "payments", label: "Payments" },
   { key: "procurement", label: "Procurement" },
   { key: "receivables", label: "Receivables" },
+  { key: "grades", label: "Grades" },
+  { key: "push", label: "Push Notifications" },
   { key: "analytics", label: "Analytics" },
 ] as const;
 
@@ -96,6 +102,21 @@ export function QuickExport() {
           customer: row.customer,
           outstanding: row.outstanding,
           daysOverdue: row.daysOverdue,
+        })),
+      );
+    } else if (key === "grades") {
+      downloadCsv("petrotrade-grades.csv", gradeExportRows(useGradeStore.getState().grades));
+    } else if (key === "push") {
+      downloadCsv(
+        "petrotrade-push-notifications.csv",
+        usePushNotificationStore.getState().notifications.map((row) => ({
+          id: row.id,
+          title: row.title,
+          platforms: row.platforms.map((p) => PLATFORM_LABELS[p]).join(" | "),
+          audience: audienceLabel(row),
+          category: CATEGORY_LABELS[row.category],
+          status: STATUS_LABELS[row.status],
+          delivered: row.delivered,
         })),
       );
     } else {

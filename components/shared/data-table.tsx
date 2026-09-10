@@ -30,8 +30,10 @@ interface DataTableProps<T> {
   columns: SimpleColumn<T>[];
   getRowId: (row: T) => string;
   onRowClick?: (row: T) => void;
+  getRowClassName?: (row: T) => string | undefined;
   emptyTitle?: string;
   emptyDescription?: string;
+  emptyAction?: ReactNode;
   pageSize?: number;
 }
 
@@ -40,8 +42,10 @@ export function DataTable<T>({
   columns,
   getRowId,
   onRowClick,
+  getRowClassName,
   emptyTitle = "No records found",
   emptyDescription = "Try changing your filters.",
+  emptyAction,
   pageSize = 5,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -77,7 +81,7 @@ export function DataTable<T>({
   }, [page, safePage]);
 
   if (rows.length === 0) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+    return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
 
   return (
@@ -116,7 +120,7 @@ export function DataTable<T>({
             {pageRows.map((row) => (
               <TableRow
                 key={getRowId(row)}
-                className={cn(onRowClick && "cursor-pointer")}
+                className={cn(onRowClick && "cursor-pointer", getRowClassName?.(row))}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((column) => (

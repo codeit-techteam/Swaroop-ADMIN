@@ -20,6 +20,39 @@ export function downloadCsv(filename: string, rows: Record<string, string | numb
   triggerDownload(filename, new Blob([csv], { type: "text/csv;charset=utf-8;" }));
 }
 
+export function downloadExcel(filename: string, rows: Record<string, string | number | boolean | null | undefined>[]) {
+  const headers = rows[0] ? Object.keys(rows[0]) : ["value"];
+  const escapeXml = (value: string | number | boolean | null | undefined) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const headerRow = `<Row>${headers.map((header) => `<Cell><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`).join("")}</Row>`;
+  const body = rows
+    .map(
+      (row) =>
+        `<Row>${headers
+          .map((header) => {
+            const value = row[header];
+            const isNumber = typeof value === "number";
+            return `<Cell><Data ss:Type="${isNumber ? "Number" : "String"}">${escapeXml(value)}</Data></Cell>`;
+          })
+          .join("")}</Row>`,
+    )
+    .join("");
+
+  const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Worksheet ss:Name="Grades"><Table>${headerRow}${body}</Table></Worksheet>
+</Workbook>`;
+
+  triggerDownload(filename, new Blob([xml], { type: "application/vnd.ms-excel" }));
+}
+
 function triggerDownload(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

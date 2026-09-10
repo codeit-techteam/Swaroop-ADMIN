@@ -1,6 +1,8 @@
 import { useBannerStore } from "@/store/banner-store";
 import { useDataStore } from "@/store/data-store";
+import { useGradeStore } from "@/store/grade-store";
 import { useProcurementStore } from "@/store/procurement-store";
+import { usePushNotificationStore } from "@/store/push-notification-store";
 
 export interface SearchHit {
   id: string;
@@ -11,9 +13,11 @@ export interface SearchHit {
     | "Orders"
     | "Shipments"
     | "Products"
+    | "Grades"
     | "Purchase Requests"
     | "Offers"
-    | "Banners";
+    | "Banners"
+    | "Push Notifications";
   title: string;
   subtitle: string;
   href: string;
@@ -126,6 +130,30 @@ export function searchPlatform(query: string): SearchHit[] {
         title: item.name,
         subtitle: `${item.campaignName} · ${item.platforms.join(", ")}`,
         href: "/content/banners",
+      });
+    }
+  }
+  for (const item of useGradeStore.getState().grades) {
+    const haystack = `${item.gradeCode} ${item.gradeName} ${item.categoryName} ${item.description ?? ""} ${item.applications.join(" ")}`;
+    if (haystack.toLowerCase().includes(q)) {
+      hits.push({
+        id: item.id,
+        group: "Grades",
+        title: item.gradeName,
+        subtitle: `${item.gradeCode} · ${item.categoryName}`,
+        href: `/master-data/grades/${item.id}`,
+      });
+    }
+  }
+  for (const item of usePushNotificationStore.getState().notifications) {
+    const haystack = `${item.id} ${item.name} ${item.title} ${item.body} ${item.platforms.join(" ")}`;
+    if (haystack.toLowerCase().includes(q)) {
+      hits.push({
+        id: item.id,
+        group: "Push Notifications",
+        title: item.title,
+        subtitle: `${item.name} · ${item.platforms.join(", ")}`,
+        href: "/content/push-notifications",
       });
     }
   }

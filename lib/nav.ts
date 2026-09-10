@@ -2,12 +2,14 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   Bell,
+  BellRing,
   Building2,
   ClipboardCheck,
   CreditCard,
   Factory,
   FileText,
   Handshake,
+  Layers,
   LayoutDashboard,
   PackageSearch,
   Scale,
@@ -18,7 +20,6 @@ import {
   Truck,
   Users,
   Wallet,
-  FileSearch,
   ImageIcon,
 } from "lucide-react";
 
@@ -52,6 +53,10 @@ export const adminNav: NavSection[] = [
     ],
   },
   {
+    label: "MASTER DATA",
+    items: [{ href: "/master-data/grades", label: "Grade Master", icon: Layers }],
+  },
+  {
     label: "COMMERCE",
     items: [
       { href: "/orders", label: "Orders", icon: ShoppingCart },
@@ -79,14 +84,16 @@ export const adminNav: NavSection[] = [
   },
   {
     label: "CONTENT MANAGEMENT",
-    items: [{ href: "/content/banners", label: "Banner Management", icon: ImageIcon }],
+    items: [
+      { href: "/content/banners", label: "Banner Management", icon: ImageIcon },
+      { href: "/content/push-notifications", label: "Push Notifications", icon: BellRing },
+    ],
   },
   {
     label: "SYSTEM",
     items: [
       { href: "/notifications", label: "Notifications", icon: Bell },
       { href: "/documents", label: "Documents", icon: FileText },
-      { href: "/audit-logs", label: "Audit Logs", icon: FileSearch },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },

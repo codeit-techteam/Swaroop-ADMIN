@@ -18,6 +18,7 @@ const ALL_ROUTES = [
   "/users",
   "/kyc",
   "/catalog",
+  "/master-data",
   "/orders",
   "/offers",
   "/payments",
@@ -29,7 +30,6 @@ const ALL_ROUTES = [
   "/content",
   "/notifications",
   "/documents",
-  "/audit-logs",
   "/profile",
   "/settings",
 ] as const;
@@ -45,6 +45,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/orders",
     "/logistics",
     "/disputes",
+    "/master-data",
     "/notifications",
     "/profile",
   ],
@@ -54,6 +55,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/sellers",
     "/offers",
     "/catalog",
+    "/master-data",
     "/notifications",
     "/profile",
   ],
@@ -62,6 +64,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/payments",
     "/receivables",
     "/credit-insurance",
+    "/master-data",
     "/orders",
     "/notifications",
     "/profile",
@@ -71,7 +74,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/kyc",
     "/documents",
     "/disputes",
-    "/audit-logs",
+    "/master-data",
     "/notifications",
     "/profile",
   ],
@@ -85,12 +88,12 @@ export function canAccessRoute(role: AdminRole, pathname: string) {
 
 export function permissionLabels(role: AdminRole) {
   const map: Record<AdminRole, string[]> = {
-    SUPER_ADMIN: ["Full platform control", "User & role administration", "Finance overrides", "Audit access", "Content management"],
-    ADMIN: ["Operational control", "KYC & offers review", "Order management", "Analytics"],
-    OPERATIONS: ["Orders", "Procurement", "Logistics", "Disputes"],
-    PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog"],
-    FINANCE: ["Payments", "Receivables", "Credit insurance"],
-    COMPLIANCE: ["KYC", "Documents", "Disputes", "Audit logs"],
+    SUPER_ADMIN: ["Full platform control", "User & role administration", "Grade Master", "Finance overrides", "Content management", "Push notifications"],
+    ADMIN: ["Operational control", "Grade Master", "KYC & offers review", "Order management", "Analytics", "Push notifications"],
+    OPERATIONS: ["Orders", "Procurement", "Logistics", "Disputes", "Grade Master (view)"],
+    PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog", "Grade Master"],
+    FINANCE: ["Payments", "Receivables", "Credit insurance", "Grade Master (view)"],
+    COMPLIANCE: ["KYC", "Documents", "Disputes", "Grade Master (view)"],
     SUPPORT: ["Customers", "Users", "Disputes"],
   };
   return map[role];

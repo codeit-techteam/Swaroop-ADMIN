@@ -81,6 +81,7 @@ export interface PlatformUser {
   createdAt: string;
 }
 
+/** Catalog inventory snapshot. Canonical tradable identity lives in Grade Master — see `types/grade.ts`. */
 export interface ProductGrade {
   id: string;
   grade: string;
@@ -418,3 +419,20 @@ export interface TimelineEvent {
   time: string;
   source?: AppSource;
 }
+
+export type {
+  Grade,
+  GradeCategory,
+  GradeInput,
+  GradePublicPayload,
+  GradeStatus,
+} from "./grade";
+
+export type {
+  PushNotification,
+  PushNotificationInput,
+  PushPublicPayload,
+  PushStatus,
+  PushPlatform,
+} from "./push-notification";
+

@@ -42,6 +42,22 @@ export function formatDateTime(value: string | Date) {
   }).format(new Date(value));
 }
 
+export function formatRelativeTime(value: string | Date, now = new Date()) {
+  const then = new Date(value).getTime();
+  const diffMs = now.getTime() - then;
+  if (!Number.isFinite(then) || diffMs < 0) {
+    return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(new Date(value));
+  }
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(new Date(value));
+}
+
 export function greetingForNow(date = new Date()) {
   const hour = date.getHours();
   if (hour < 12) return "Good Morning";

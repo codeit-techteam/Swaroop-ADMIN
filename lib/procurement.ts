@@ -77,8 +77,32 @@ export const APPROVABLE_STATUSES: ProcurementStatus[] = [
   "Pending Approval",
 ];
 
-export type QuickFilter = "all" | "Negotiation" | "Urgent Review" | "Pending Inv.";
+export type QuickFilter =
+  | "all"
+  | "needs-action"
+  | "Negotiation"
+  | "Urgent Review"
+  | "Pending Inv."
+  | "Approved";
 export type KpiFilter = "pending-approvals" | "avg-time" | "negotiations" | "open-po" | null;
+
+export const ATTENTION_STATUSES: ProcurementStatus[] = [
+  "Urgent Review",
+  "Pending Approval",
+  "Pending Inv.",
+  "Under Review",
+];
+
+export function needsAttention(status: ProcurementStatus) {
+  return ATTENTION_STATUSES.includes(status);
+}
+
+export function rowAccent(status: ProcurementStatus) {
+  if (status === "Urgent Review") return "urgent";
+  if (status === "Approved") return "ready";
+  if (ATTENTION_STATUSES.includes(status) || status === "Negotiation") return "wait";
+  return "neutral";
+}
 
 export interface AdvancedFilters {
   status: ProcurementStatus | "";
@@ -268,7 +292,8 @@ export function applyFilters(
       return false;
     }
 
-    if (opts.quick !== "all" && row.status !== opts.quick) return false;
+    if (opts.quick === "needs-action" && !needsAttention(row.status)) return false;
+    else if (opts.quick !== "all" && opts.quick !== "needs-action" && row.status !== opts.quick) return false;
 
     const adv = opts.advanced;
     if (adv.status && row.status !== adv.status) return false;

@@ -25,8 +25,20 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     else if (!canAccessRoute(user.role, pathname)) router.replace("/dashboard");
   }, [hydrated, user, pathname, router]);
 
-  if (!hydrated || !user) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading PetroTrade OS…</div>;
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Loading PetroTrade OS…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Redirecting to sign in…
+      </div>
+    );
   }
 
   return (
