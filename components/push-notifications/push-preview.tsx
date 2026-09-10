@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
-
 import { SourceBadge } from "@/components/shared/source-badge";
 import { CHANNEL_LABELS, PLATFORM_LABELS } from "@/lib/push-notification-utils";
 import { cn } from "@/lib/utils";
