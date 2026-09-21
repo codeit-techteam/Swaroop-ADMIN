@@ -92,7 +92,7 @@ export function permissionLabels(role: AdminRole) {
   const map: Record<AdminRole, string[]> = {
     SUPER_ADMIN: ["Full platform control", "User & role administration", "Grade Master", "Finance overrides", "Content management", "Push notifications"],
     ADMIN: ["Operational control", "Grade Master", "KYC & offers review", "Order management", "Analytics", "Push notifications"],
-    OPERATIONS: ["Orders", "Procurement", "Logistics", "Disputes", "Grade Master (view)"],
+    OPERATIONS: ["Orders", "Procurement", "Logistics", "Bulk Logistics Quotes", "Disputes", "Grade Master (view)"],
     PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog", "Grade Master"],
     FINANCE: ["Payments", "Receivables", "Credit Management", "Grade Master (view)"],
     COMPLIANCE: ["KYC", "Documents", "Disputes", "Grade Master (view)"],

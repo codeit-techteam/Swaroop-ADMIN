@@ -75,6 +75,7 @@ export const adminNav: NavSection[] = [
     label: "OPERATIONS",
     items: [
       { href: "/logistics", label: "Logistics", icon: Truck },
+      { href: "/logistics/bulk-quotes", label: "Bulk Logistics Quotes", icon: ClipboardCheck },
       { href: "/disputes", label: "Disputes", icon: Scale },
     ],
   },
@@ -106,6 +107,12 @@ export function isNavActive(pathname: string, href: string) {
   }
   if (href === "/credit") {
     return pathname === "/credit" || pathname.startsWith("/credit/");
+  }
+  if (href === "/logistics/bulk-quotes") {
+    return pathname === "/logistics/bulk-quotes" || pathname.startsWith("/logistics/bulk-quotes/");
+  }
+  if (href === "/logistics") {
+    return pathname === "/logistics" || (pathname.startsWith("/logistics/") && !pathname.startsWith("/logistics/bulk-quotes"));
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
