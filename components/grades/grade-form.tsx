@@ -29,7 +29,7 @@ import {
   validateGradeInput,
   type GradeFormErrors,
 } from "@/lib/grade-utils";
-import { GRADE_CATEGORIES } from "@/lib/mock-data/grades";
+import { getLiveCategories } from "@/lib/grade-utils";
 import { cn } from "@/lib/utils";
 import type { Grade, GradeInput, GradeStatus } from "@/types/grade";
 
@@ -160,7 +160,7 @@ export function GradeForm({
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {GRADE_CATEGORIES.map((category) => (
+              {getLiveCategories().map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
                   <span className="text-muted-foreground"> · {category.parentGroup}</span>

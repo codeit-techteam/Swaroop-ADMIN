@@ -7,6 +7,7 @@ import { AdminHeader } from "@/components/layout/header";
 import { AdminSidebar } from "@/components/layout/sidebar";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { QuickExport } from "@/components/layout/quick-export";
+import { ShellSkeleton } from "@/components/shared/states";
 import { canAccessRoute } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
@@ -26,19 +27,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [hydrated, user, pathname, router]);
 
   if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading PetroTrade OS…
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Redirecting to sign in…
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   return (

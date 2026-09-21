@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GRADE_CATEGORIES } from "@/lib/mock-data/grades";
+import { getLiveCategories } from "@/lib/grade-utils";
 import { useGradeStore } from "@/store/grade-store";
 import type { GradeStatus, GradeVisibilityFilter } from "@/types/grade";
 
@@ -51,7 +51,7 @@ export function GradeFilters() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Categories</SelectItem>
-            {GRADE_CATEGORIES.map((category) => (
+            {getLiveCategories().map((category) => (
               <SelectItem key={category.id} value={category.id}>
                 {category.name}
               </SelectItem>

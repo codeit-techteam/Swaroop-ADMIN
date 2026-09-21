@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/lib/format";
+import { listAdminKyc } from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 import type { KycStatus } from "@/types";
@@ -22,12 +23,34 @@ export default function KycPage() {
   const user = useAuthStore((s) => s.user);
   const [pending, setPending] = useState<{ id: string; next: KycStatus } | null>(null);
   const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ kyc: await listAdminKyc() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load KYC records.");
+      useDataStore.setState({ kyc: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <>
       <EntityWorkbench
         title="KYC Control Center"
         description="Review customer and seller verification packs from all applications."
+        loading={loading}
+        loadingError={loadError}
+        onRetry={() => void load()}
         rows={rows}
         getRowId={(r) => r.id}
         columns={[
@@ -77,7 +100,7 @@ export default function KycPage() {
         open={Boolean(pending)}
         onOpenChange={(open) => !open && setPending(null)}
         title={`${pending?.next === "Approved" ? "Approve" : pending?.next === "Rejected" ? "Reject" : "Request changes on"} KYC`}
-        description="Reviewer notes are stored on the mock KYC record and audit log."
+        description="Reviewer notes are stored on the KYC record and audit log. Approve/reject for sellers uses /admin/compliance."
         destructive={pending?.next === "Rejected"}
         extra={<Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reviewer notes" />}
         onConfirm={() => {

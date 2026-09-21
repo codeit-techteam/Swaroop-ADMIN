@@ -75,7 +75,7 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="admin@petrotrade.com"
+                placeholder="admin@test.local"
                 {...form.register("email")}
                 aria-invalid={Boolean(form.formState.errors.email)}
               />

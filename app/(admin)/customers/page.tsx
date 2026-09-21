@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailRow } from "@/components/shared/detail-drawer";
@@ -9,10 +10,11 @@ import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
+import { CustomerCreditPanel } from "@/components/credit/customer-credit-panel";
 import { formatInr, formatNumber } from "@/lib/format";
+import { listAdminCustomers, suspendAdminCustomer } from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
-import { useState } from "react";
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -21,12 +23,34 @@ export default function CustomersPage() {
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ customers: await listAdminCustomers() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load customers.");
+      useDataStore.setState({ customers: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <>
       <EntityWorkbench
         title="Customers"
         description="Admin visibility across Customer Mobile App and Customer Web App users."
+        loading={loading}
+        loadingError={loadError}
+        onRetry={() => void load()}
         breadcrumbs={[{ label: "Ecosystem" }, { label: "Customers" }]}
         kpis={[
           { label: "Active", value: String(rows.filter((r) => r.status === "Active").length) },
@@ -43,7 +67,7 @@ export default function CustomersPage() {
           { key: "email", header: "Email", accessor: (r) => r.email },
           { key: "location", header: "Location", accessor: (r) => r.location },
           { key: "kyc", header: "KYC", render: (r) => <StatusBadge value={r.kycStatus} /> },
-          { key: "credit", header: "Credit Limit", sortable: true, accessor: (r) => r.creditLimit, render: (r) => formatInr(r.creditLimit) },
+          { key: "credit", header: "Credit", render: () => "PetroTrade managed" },
           { key: "orders", header: "Orders", sortable: true, accessor: (r) => r.orders, render: (r) => formatNumber(r.orders) },
           { key: "spend", header: "Spend", sortable: true, accessor: (r) => r.spend, render: (r) => formatInr(r.spend) },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
@@ -73,7 +97,7 @@ export default function CustomersPage() {
             <DetailRow label="GST" value={r.gst} />
             <DetailRow label="PAN" value={r.pan} />
             <DetailRow label="KYC" value={<StatusBadge value={r.kycStatus} />} />
-            <DetailRow label="Credit" value={`${formatInr(r.usedCredit)} / ${formatInr(r.creditLimit)}`} />
+            <CustomerCreditPanel customerId={r.id} />
             <DetailRow label="Orders" value={r.orders} />
             <DetailRow label="Addresses" value={r.addresses.join(" · ")} />
             <DetailRow label="Source" value={<SourceBadge source={r.source} />} />
@@ -93,11 +117,16 @@ export default function CustomersPage() {
         description="This is an Admin control action. The buyer will no longer transact until reactivated."
         confirmLabel="Suspend"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!confirmId) return;
-          updateCustomer(confirmId, { status: "Suspended" });
-          pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Suspended customer ${confirmId}`, module: "Customers", entity: confirmId, result: "Success" });
-          toast.success("Customer suspended");
+          try {
+            await suspendAdminCustomer(confirmId);
+            updateCustomer(confirmId, { status: "Suspended" });
+            pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Suspended customer ${confirmId}`, module: "Customers", entity: confirmId, result: "Success" });
+            toast.success("Customer suspended");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to suspend customer.");
+          }
           setConfirmId(null);
         }}
       />

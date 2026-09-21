@@ -2,30 +2,32 @@
 
 import {
   AlertTriangle,
-  Building2,
-  Factory,
+  Boxes,
+  Layers3,
   RefreshCw,
   ShoppingCart,
-  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ActivityTimeline } from "@/components/shared/activity-timeline";
 import { CmsOverview } from "@/components/content/cms-overview";
 import { ChartCard } from "@/components/shared/chart-card";
-import { CreditRiskChart } from "@/components/shared/charts/credit-risk-chart";
-import { RevenueGrowthChart } from "@/components/shared/charts/revenue-growth-chart";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { SourceBadge } from "@/components/shared/source-badge";
+import { ChartSkeleton, KpiSkeleton } from "@/components/shared/states";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { downloadCsv } from "@/lib/csv";
 import { formatInr, greetingForNow } from "@/lib/format";
-import { creditRiskExposure, revenueSeries } from "@/lib/mock-data";
+import { getGrades } from "@/lib/api/grades";
+import { listAdminProducts } from "@/lib/api/products";
+import { getCreditSummary } from "@/lib/api/credit";
+import { listAdminKyc, listAdminPayments, listAdminShipments } from "@/lib/api/ops";
+import { displayMoney } from "@/lib/credit-format";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
@@ -44,11 +46,99 @@ export default function DashboardPage() {
   const shipments = useDataStore((s) => s.shipments);
   const [range, setRange] = useState<(typeof RANGES)[number]>("30 Days");
   const [tick, setTick] = useState(0);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [creditLoading, setCreditLoading] = useState(true);
+  const [catalogStats, setCatalogStats] = useState({
+    grades: 0,
+    activeGrades: 0,
+    products: 0,
+    activeProducts: 0,
+  });
+  const [creditStats, setCreditStats] = useState<{
+    pendingApplications: string;
+    approvedAccounts: string;
+    outstanding: string;
+    overdue: string;
+    error: string | null;
+  }>({
+    pendingApplications: "—",
+    approvedAccounts: "—",
+    outstanding: "—",
+    overdue: "—",
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogLoading(true);
+    setCreditLoading(true);
+    void Promise.all([getGrades(), listAdminProducts()])
+      .then(([grades, products]) => {
+        if (cancelled) return;
+        setCatalogStats({
+          grades: grades.length,
+          activeGrades: grades.filter((item) => item.status === "ACTIVE").length,
+          products: products.length,
+          activeProducts: products.filter((item) => item.status === "Active").length,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCatalogStats({ grades: 0, activeGrades: 0, products: 0, activeProducts: 0 });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    void Promise.all([listAdminKyc(), listAdminPayments(), listAdminShipments()])
+      .then(([kycRows, paymentRows, shipmentRows]) => {
+        if (cancelled) return;
+        useDataStore.setState({
+          kyc: kycRows,
+          payments: paymentRows,
+          shipments: shipmentRows,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          useDataStore.setState({ kyc: [], payments: [], shipments: [] });
+        }
+      });
+    void getCreditSummary()
+      .then((summary) => {
+        if (cancelled) return;
+        setCreditStats({
+          pendingApplications: String(summary.pendingApplications),
+          approvedAccounts: String(summary.approvedAccounts),
+          outstanding: displayMoney(summary.outstandingAmount),
+          overdue: displayMoney(summary.overdueAmount),
+          error: null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCreditStats({
+            pendingApplications: "—",
+            approvedAccounts: "—",
+            outstanding: "—",
+            overdue: "—",
+            error: "Credit API not available",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCreditLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tick]);
 
   const pendingKyc = kyc.filter((item) => item.status === "Pending" || item.status === "Under Review").length;
   const pendingPayments = payments.filter((item) => item.status === "Pending" || item.status === "Processing").length;
   const delayedShipments = shipments.filter((item) => item.status === "Delayed");
   const delayed = delayedShipments.length;
+  const pendingDispatch = delayed;
   const openDisputes = disputes.filter((item) => item.status !== "Resolved" && item.status !== "Rejected");
   const criticalDisputes = openDisputes.filter((item) => item.priority === "Critical");
 
@@ -88,10 +178,15 @@ export default function DashboardPage() {
   ];
 
   const activity = [
-    { id: "a1", title: "Order #PT-9021 Placed", detail: "PP RAFFIA · Apex Polymers", time: "2026-09-05T07:18:00+05:30", source: "Customer Web" as const },
-    { id: "a2", title: "KYC Approved", detail: "Apex Polymers company pack", time: "2026-09-04T18:10:00+05:30", source: "Admin Portal" as const },
-    { id: "a3", title: "Payment Verified", detail: "PAY-55101 RTGS", time: "2026-09-05T07:42:00+05:30", source: "Admin Portal" as const },
-    { id: "a4", title: "Dispatch Update", detail: "SHP-4401 in transit", time: "2026-09-05T06:55:00+05:30", source: "Seller App" as const },
+    {
+      id: "catalog",
+      title: "Grade Master connected",
+      detail: catalogLoading
+        ? "Loading catalog stats…"
+        : `${catalogStats.activeGrades} active grades · ${catalogStats.activeProducts} active products`,
+      time: new Date().toISOString(),
+      source: "Admin Portal" as const,
+    },
   ];
 
   return (
@@ -115,12 +210,13 @@ export default function DashboardPage() {
               type="button"
               size="sm"
               variant="outline"
+              disabled={catalogLoading}
               onClick={() =>
                 downloadCsv("dashboard-kpis.csv", [
-                  { metric: "Buyers", value: 1284 },
-                  { metric: "Sellers", value: 452 },
-                  { metric: "Orders", value: 8920 },
-                  { metric: "Revenue", value: 142000000 },
+                  { metric: "Grades", value: catalogStats.grades },
+                  { metric: "Active grades", value: catalogStats.activeGrades },
+                  { metric: "Products", value: catalogStats.products },
+                  { metric: "Active products", value: catalogStats.activeProducts },
                 ])
               }
             >
@@ -165,53 +261,64 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Total Buyers" value="1,284" icon={Building2} href="/customers" />
-        <KpiCard label="Total Sellers" value="452" icon={Factory} href="/sellers" />
-        <KpiCard label="Total Orders" value="8,920" icon={ShoppingCart} href="/orders" />
-        <KpiCard label="Total Revenue" value="₹14.2 Cr" icon={Wallet} href="/analytics" />
-      </div>
+      {catalogLoading ? (
+        <KpiSkeleton />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard label="Grade Master" value={String(catalogStats.grades)} icon={Layers3} href="/master-data/grades" />
+          <KpiCard label="Active Grades" value={String(catalogStats.activeGrades)} icon={Layers3} href="/master-data/grades" />
+          <KpiCard label="Products" value={String(catalogStats.products)} icon={Boxes} href="/catalog" />
+          <KpiCard label="Active Products" value={String(catalogStats.activeProducts)} icon={ShoppingCart} href="/catalog" />
+        </div>
+      )}
       <section className="rounded-md border bg-white p-4 shadow-soft">
         <p className="section-label mb-3">Operations Oversight</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard label="Pending KYC" value={String(pendingKyc)} href="/kyc" tone="warning" />
           <KpiCard label="Pending Payments" value={String(pendingPayments)} href="/payments" tone="warning" />
-          <KpiCard label="Pending Dispatch" value="8" href="/logistics" tone="warning" />
+          <KpiCard label="Pending Dispatch" value={String(pendingDispatch)} href="/logistics" tone="warning" />
           <KpiCard label="Open Disputes" value={String(openDisputes.length)} href="/disputes" tone="danger" />
           <KpiCard label="Delayed Deliveries" value={String(delayed)} href="/logistics" tone="danger" />
         </div>
       </section>
+      <section className="rounded-md border bg-white p-4 shadow-soft">
+        <p className="section-label mb-3">PetroTrade Credit</p>
+        {creditLoading ? (
+          <KpiSkeleton />
+        ) : (
+          <>
+            {creditStats.error ? (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Credit KPIs require the admin credit API. {creditStats.error}.
+              </p>
+            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard label="Credit applications" value={creditStats.pendingApplications} href="/credit/applications" tone="warning" />
+              <KpiCard label="Active credit accounts" value={creditStats.approvedAccounts} href="/credit/accounts" />
+              <KpiCard label="Outstanding" value={creditStats.outstanding} href="/credit/repayments" />
+              <KpiCard label="Overdue" value={creditStats.overdue} href="/credit/repayments" tone="danger" />
+            </div>
+          </>
+        )}
+      </section>
       <CmsOverview />
-      <div className="grid gap-4 xl:grid-cols-3">
-        <ChartCard title="Credit Exposure">
-          <div className="grid gap-3">
-            <div className="flex justify-between text-sm"><span>Credit Outstanding</span><span className="font-semibold">₹2.4 Cr</span></div>
-            <div className="flex justify-between text-sm"><span>Collection Due</span><span className="font-semibold">₹85L</span></div>
-            <div className="flex justify-between text-sm text-red-700"><span>Overdue Amount</span><span className="font-semibold">₹12L</span></div>
-          </div>
-        </ChartCard>
-        <ChartCard title="Verified Payments">
-          <p className="text-3xl font-semibold">₹1.8 Cr</p>
-          <p className="mt-1 text-sm text-muted-foreground">Processed Today</p>
-          <Button className="mt-4" size="sm" variant="outline" onClick={() => router.push("/payments")}>
-            Open payments
-          </Button>
-        </ChartCard>
-        <ChartCard
-          title="Credit Risk Exposure"
-          description="Outstanding credit split by risk band"
-        >
-          <CreditRiskChart data={creditRiskExposure} />
-        </ChartCard>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <ChartCard
-          title="Revenue Growth"
-          description="Daily revenue in ₹ lakh · last 30 days"
-          className="xl:col-span-2"
-        >
-          <RevenueGrowthChart data={revenueSeries} />
-        </ChartCard>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {catalogLoading ? (
+          <ChartSkeleton />
+        ) : (
+          <ChartCard title="Catalog source of truth">
+            <p className="text-sm text-muted-foreground">
+              Grade Master and Product records are loaded from PostgreSQL through Swaroop-Backend.
+              Credit KPIs are loaded from PetroTrade Credit Management APIs.
+            </p>
+            <div className="mt-4 grid gap-2 text-sm">
+              <div className="flex justify-between"><span>Grades in master</span><span className="font-semibold">{catalogStats.grades}</span></div>
+              <div className="flex justify-between"><span>Active grades</span><span className="font-semibold">{catalogStats.activeGrades}</span></div>
+              <div className="flex justify-between"><span>Products</span><span className="font-semibold">{catalogStats.products}</span></div>
+              <div className="flex justify-between"><span>Active products</span><span className="font-semibold">{catalogStats.activeProducts}</span></div>
+            </div>
+          </ChartCard>
+        )}
         <ChartCard title="Activity Feed">
           <ActivityTimeline key={tick} items={activity} />
         </ChartCard>

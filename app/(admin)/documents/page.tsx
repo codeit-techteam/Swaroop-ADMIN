@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DetailRow } from "@/components/shared/detail-drawer";
@@ -8,6 +9,7 @@ import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
+import { listAdminDocuments } from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 
@@ -16,11 +18,33 @@ export default function DocumentsPage() {
   const updateDocument = useDataStore((s) => s.updateDocument);
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ documents: await listAdminDocuments() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load documents.");
+      useDataStore.setState({ documents: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <EntityWorkbench
       title="Document Center"
       description="KYC, commercial and compliance artifacts across the ecosystem."
+      loading={loading}
+      loadingError={loadError}
+      onRetry={() => void load()}
       rows={rows}
       getRowId={(r) => r.id}
       columns={[

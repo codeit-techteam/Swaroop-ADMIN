@@ -436,3 +436,14 @@ export type {
   PushPlatform,
 } from "./push-notification";
 
+export type {
+  CreditAccount as PlatformCreditAccount,
+  CreditApplication,
+  CreditAuditEvent,
+  CreditDocument,
+  CreditInsurance,
+  CreditRepayment,
+  CreditSummary,
+  CreditTransaction,
+} from "./credit";
+

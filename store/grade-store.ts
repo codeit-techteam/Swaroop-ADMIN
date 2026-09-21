@@ -133,29 +133,9 @@ function recordEvents(
 }
 
 export const useGradeStore = create<GradeState>((set, get) => ({
-  grades: gradeApi.getGradesSync(),
-  auditEvents: [
-    {
-      id: "GAUD-SEED-1",
-      action: "Grade Updated",
-      gradeId: "GRD-1001",
-      gradeCode: "HDPE_FILM",
-      admin: "Admin",
-      timestamp: "2026-09-08T11:22:00.000Z",
-      field: "Customer Visible",
-      oldValue: "YES",
-      newValue: "YES",
-    },
-    {
-      id: "GAUD-SEED-2",
-      action: "Grade Created",
-      gradeId: "GRD-1080",
-      gradeCode: "BASE_OIL",
-      admin: "Priya Shah",
-      timestamp: "2026-08-28T09:00:00.000Z",
-    },
-  ],
-  loadStatus: "success",
+  grades: [],
+  auditEvents: [],
+  loadStatus: "idle",
   loadError: null,
   selectedGradeId: null,
   selectedGradeIds: [],

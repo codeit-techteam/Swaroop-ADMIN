@@ -1,18 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateTime, formatInr } from "@/lib/format";
+import { listAdminOrders } from "@/lib/api/ops";
 import { useDataStore } from "@/store/data-store";
 
 export default function OrdersPage() {
   const rows = useDataStore((s) => s.orders);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ orders: await listAdminOrders() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load orders.");
+      useDataStore.setState({ orders: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
   return (
     <EntityWorkbench
       title="Orders"
       description="Orders generated from Customer Mobile App and Customer Web App."
+      loading={loading}
+      loadingError={loadError}
+      onRetry={() => void load()}
       rows={rows}
       getRowId={(r) => r.id}
       columns={[

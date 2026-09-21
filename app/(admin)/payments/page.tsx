@@ -1,18 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateTime, formatInrExact } from "@/lib/format";
+import { listAdminPayments } from "@/lib/api/ops";
 import { useDataStore } from "@/store/data-store";
 
 export default function PaymentsPage() {
   const rows = useDataStore((s) => s.payments);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ payments: await listAdminPayments() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load payments.");
+      useDataStore.setState({ payments: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
   return (
     <EntityWorkbench
       title="Payments"
       description="Payment verification across customer, seller and Admin Portal actions."
+      loading={loading}
+      loadingError={loadError}
+      onRetry={() => void load()}
       kpis={[
         { label: "Verified", value: String(rows.filter((r) => r.status === "Verified").length), tone: "success" },
         { label: "Pending", value: String(rows.filter((r) => r.status === "Pending").length), tone: "warning" },

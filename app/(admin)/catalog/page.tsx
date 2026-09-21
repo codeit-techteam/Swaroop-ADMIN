@@ -1,34 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { listAdminProducts, updateAdminProductStatus } from "@/lib/api/products";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
+import type { ProductGrade } from "@/types";
 
 export default function CatalogPage() {
   const rows = useDataStore((s) => s.products);
-  const addProduct = useDataStore((s) => s.addProduct);
   const updateProduct = useDataStore((s) => s.updateProduct);
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
-  const [open, setOpen] = useState(false);
-  const [grade, setGrade] = useState("PP HOMO RAFFIA 3.5MFI");
-  const [commodity, setCommodity] = useState("PP");
-  const [manufacturer, setManufacturer] = useState("Reliance");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pending, setPending] = useState<ProductGrade | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const products = await listAdminProducts();
+      useDataStore.setState({ products });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load catalog.");
+      useDataStore.setState({ products: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <>
       <EntityWorkbench
         title="Catalog"
         description="Industrial grades identified by commodity, manufacturer, brand and specification. Images are optional and not required."
+        loading={loading}
+        loadingError={loadError}
+        onRetry={() => void load()}
         kpis={[
           { label: "Active grades", value: String(rows.filter((r) => r.status === "Active").length) },
           { label: "Active sellers", value: String(rows.reduce((s, r) => s + r.activeSellers, 0)), href: "/sellers" },
@@ -66,51 +86,49 @@ export default function CatalogPage() {
           </dl>
         )}
         drawerFooter={(r) => (
-          <Button
-            className="w-full"
-            variant="outline"
-            onClick={() => {
-              const next = r.status === "Active" ? "Inactive" : "Active";
-              updateProduct(r.id, { status: next });
-              pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `${next} grade ${r.grade}`, module: "Catalog", entity: r.id, result: "Success" });
-              toast.success(`Grade ${next.toLowerCase()}`);
-            }}
-          >
-            {rows.find((item) => item.id === r.id)?.status === "Active" ? "Deactivate" : "Activate"}
+          <Button className="w-full" variant="outline" onClick={() => setPending(r)}>
+            {r.status === "Active" ? "Deactivate" : "Activate"}
           </Button>
         )}
-        actions={<Button size="sm" onClick={() => setOpen(true)}>Create grade</Button>}
-      />
-      <ConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="Create grade"
-        description="No product image is collected. Grade identity is specification-first."
-        confirmLabel="Create"
-        extra={
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5"><Label>Grade</Label><Input value={grade} onChange={(e) => setGrade(e.target.value)} /></div>
-            <div className="flex flex-col gap-1.5"><Label>Commodity</Label><Input value={commodity} onChange={(e) => setCommodity(e.target.value)} /></div>
-            <div className="flex flex-col gap-1.5"><Label>Manufacturer</Label><Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} /></div>
+        actions={
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+              Refresh
+            </Button>
+            <Button size="sm" asChild>
+              <Link href="/master-data/grades">Manage Grade Master</Link>
+            </Button>
           </div>
         }
-        onConfirm={() => {
-          const id = `GRD-${Date.now().toString().slice(-4)}`;
-          addProduct({
-            id,
-            grade,
-            commodity,
-            manufacturer,
-            brand: manufacturer,
-            specification: grade,
-            location: "Unassigned",
-            availableQty: 0,
-            activeSellers: 0,
-            activeOffers: 0,
-            inventory: 0,
-            status: "Active",
-          });
-          toast.success("Grade created without requiring an image");
+      />
+      <ConfirmDialog
+        open={Boolean(pending)}
+        onOpenChange={(open) => {
+          if (!open) setPending(null);
+        }}
+        title={pending?.status === "Active" ? "Deactivate product" : "Activate product"}
+        description="This updates PostgreSQL. Historical purchase requests remain valid."
+        confirmLabel="Confirm"
+        onConfirm={async () => {
+          if (!pending) return;
+          const next = pending.status === "Active" ? "INACTIVE" : "ACTIVE";
+          try {
+            const updated = await updateAdminProductStatus(pending.id, next);
+            updateProduct(pending.id, updated);
+            pushAudit({
+              admin: user?.name ?? "Admin",
+              role: user?.role ?? "ADMIN",
+              action: `${updated.status} product ${updated.grade}`,
+              module: "Catalog",
+              entity: pending.id,
+              result: "Success",
+            });
+            toast.success(`Product ${updated.status.toLowerCase()}`);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to update product.");
+          } finally {
+            setPending(null);
+          }
         }}
       />
     </>

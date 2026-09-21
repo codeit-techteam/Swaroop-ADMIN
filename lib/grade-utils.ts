@@ -1,7 +1,7 @@
-import { GRADE_CATEGORIES } from "@/lib/mock-data/grades";
 import type {
   Grade,
   GradeAuditEvent,
+  GradeCategory,
   GradeFilters,
   GradeImportIssue,
   GradeImportPreview,
@@ -13,6 +13,16 @@ import type {
   GradeStatus,
   GradeUsage,
 } from "@/types/grade";
+
+let liveCategories: GradeCategory[] = [];
+
+export function setCategoryCache(categories: GradeCategory[]) {
+  if (categories.length) liveCategories = categories;
+}
+
+export function getLiveCategories(): GradeCategory[] {
+  return liveCategories;
+}
 
 export const STATUS_LABELS: Record<GradeStatus, string> = {
   ACTIVE: "Active",
@@ -52,12 +62,12 @@ export function normalizeGradeCode(value: string) {
 }
 
 export function categoryById(categoryId: string) {
-  return GRADE_CATEGORIES.find((item) => item.id === categoryId);
+  return liveCategories.find((item) => item.id === categoryId);
 }
 
 export function categoryByCode(code: string) {
   const normalized = normalizeGradeCode(code);
-  return GRADE_CATEGORIES.find(
+  return liveCategories.find(
     (item) =>
       normalizeGradeCode(item.code) === normalized ||
       normalizeGradeCode(item.name) === normalized,
@@ -316,7 +326,7 @@ export function buildImportPreview(records: Record<string, string>[], existing: 
     const category =
       categoryById(categoryRaw) ??
       categoryByCode(categoryRaw) ??
-      GRADE_CATEGORIES.find((item) => item.name.toLowerCase() === categoryRaw.trim().toLowerCase());
+      liveCategories.find((item) => item.name.toLowerCase() === categoryRaw.trim().toLowerCase());
     if (!categoryRaw.trim()) issues.push("MISSING_CATEGORY");
     else if (!category) issues.push("UNKNOWN_CATEGORY");
 

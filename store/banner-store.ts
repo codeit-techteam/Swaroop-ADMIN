@@ -170,9 +170,9 @@ async function ensureMediaAssets(input: BannerInput): Promise<BannerInput> {
 }
 
 export const useBannerStore = create<BannerState>((set, get) => ({
-  banners: bannerApi.getBannersSync(),
+  banners: [],
   auditEvents: [],
-  loadStatus: "success",
+  loadStatus: "idle",
   loadError: null,
   selectedBannerId: null,
   selectedBannerIds: [],

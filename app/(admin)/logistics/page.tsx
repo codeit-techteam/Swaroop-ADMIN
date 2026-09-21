@@ -1,18 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateTime } from "@/lib/format";
+import { listAdminShipments } from "@/lib/api/ops";
 import { useDataStore } from "@/store/data-store";
 
 export default function LogisticsPage() {
   const rows = useDataStore((s) => s.shipments);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ shipments: await listAdminShipments() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load shipments.");
+      useDataStore.setState({ shipments: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
   return (
     <EntityWorkbench
       title="Logistics"
       description="Milestone-based shipment tracking. This view does not claim live GPS."
+      loading={loading}
+      loadingError={loadError}
+      onRetry={() => void load()}
       rows={rows}
       getRowId={(r) => r.id}
       columns={[

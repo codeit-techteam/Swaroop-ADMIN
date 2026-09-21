@@ -1,11 +1,10 @@
-import { delay } from "@/lib/utils";
 import {
   appendTimeline,
   gstBreakdown,
   nextProcurementId,
   withAliases,
 } from "@/lib/procurement";
-import { procurementQueue } from "@/lib/mock-data/procurement";
+import { listAdminProcurements } from "@/lib/api/ops";
 import type {
   Procurement,
   ProcurementDispatchInfo,
@@ -15,10 +14,6 @@ import type {
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
 }
 
 export interface CreateProcurementInput {
@@ -78,13 +73,12 @@ function stamp(item: Procurement, status: ProcurementStatus, extra: Partial<Proc
 
 export const procurementService = {
   async getProcurements() {
-    await delay(80);
-    return clone(procurementQueue);
+    return listAdminProcurements();
   },
 
   async getProcurementById(id: string) {
-    await delay(80);
-    return clone(procurementQueue.find((item) => item.id === id) ?? null);
+    const items = await listAdminProcurements();
+    return items.find((item) => item.id === id) ?? null;
   },
 
   createProcurement(existing: Procurement[], input: CreateProcurementInput, mode: "draft" | "submit", actor: string) {

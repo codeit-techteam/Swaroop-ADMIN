@@ -28,6 +28,7 @@ import { ProcurementDetailDrawer } from "@/components/procurement/detail-drawer"
 import { ProcurementModals } from "@/components/procurement/modals";
 import { ProcurementQueueBoard } from "@/components/procurement/queue-board";
 import { DataTable } from "@/components/shared/data-table";
+import { ErrorState, KpiSkeleton, TableSkeleton } from "@/components/shared/states";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { SourceBadge } from "@/components/shared/source-badge";
@@ -104,6 +105,13 @@ export function ProcurementWorkbench({ initialView }: { initialView?: "table" | 
   const setViewMode = useProcurementStore((s) => s.setViewMode);
   const selectProcurement = useProcurementStore((s) => s.selectProcurement);
   const openModal = useProcurementStore((s) => s.openModal);
+  const hydrate = useProcurementStore((s) => s.hydrate);
+  const loading = useProcurementStore((s) => s.loading);
+  const loadError = useProcurementStore((s) => s.loadError);
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (initialView) setViewMode(initialView);
@@ -192,6 +200,19 @@ export function ProcurementWorkbench({ initialView }: { initialView?: "table" | 
     selectProcurement(current.id);
     openModal({ type: "create-po", id: current.id });
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <KpiSkeleton />
+        <TableSkeleton />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return <ErrorState title="Unable to load purchase requests." description={loadError} onRetry={() => void hydrate()} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

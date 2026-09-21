@@ -12,7 +12,6 @@ import {
   type QueueColumnKey,
   type QuickFilter,
 } from "@/lib/procurement";
-import { procurementActivities, procurementQueue } from "@/lib/mock-data/procurement";
 import {
   procurementService,
   type CounterOfferInput,
@@ -37,6 +36,8 @@ interface ProcurementState {
   };
   viewMode: WorkbenchView;
   activities: ProcurementActivity[];
+  loading: boolean;
+  loadError: string | null;
   modal:
     | { type: "none" }
     | { type: "approve"; id: string }
@@ -59,6 +60,7 @@ interface ProcurementState {
   selectProcurement: (id: string | null) => void;
   openModal: (modal: ProcurementState["modal"]) => void;
   closeModal: () => void;
+  hydrate: () => Promise<void>;
 
   createProcurement: (input: CreateProcurementInput, mode: "draft" | "submit") => Procurement;
   updateProcurement: (id: string, patch: Partial<Procurement>) => void;
@@ -108,7 +110,7 @@ function replace(list: Procurement[], next: Procurement) {
 }
 
 export const useProcurementStore = create<ProcurementState>((set, get) => ({
-  procurements: procurementQueue,
+  procurements: [],
   selectedId: null,
   filters: {
     search: "",
@@ -117,7 +119,9 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
     advanced: EMPTY_ADVANCED_FILTERS,
   },
   viewMode: "table",
-  activities: procurementActivities,
+  activities: [],
+  loading: false,
+  loadError: null,
   modal: { type: "none" },
 
   selectedProcurement: () => {
@@ -169,6 +173,19 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
 
   openModal: (modal) => set({ modal }),
   closeModal: () => set({ modal: { type: "none" } }),
+  hydrate: async () => {
+    set({ loading: true, loadError: null });
+    try {
+      const procurements = await procurementService.getProcurements();
+      set({ procurements, loading: false, loadError: null });
+    } catch (error) {
+      set({
+        procurements: [],
+        loading: false,
+        loadError: error instanceof Error ? error.message : "Unable to load purchase requests.",
+      });
+    }
+  },
 
   createProcurement: (input, mode) => {
     const actor = actorName();

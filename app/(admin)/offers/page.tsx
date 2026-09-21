@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -10,6 +10,12 @@ import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
+import {
+  approveAdminOffer,
+  listAdminOffers,
+  rejectAdminOffer,
+  suspendAdminOffer,
+} from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 import type { Offer } from "@/types";
@@ -20,19 +26,41 @@ export default function OffersPage() {
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
   const [pending, setPending] = useState<{ id: string; status: Offer["status"] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ offers: await listAdminOffers() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load offers.");
+      useDataStore.setState({ offers: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <>
       <EntityWorkbench
         title="Offers"
         description="Admin visibility over seller offers from Seller App and Seller Web App."
+        loading={loading}
+        loadingError={loadError}
+        onRetry={() => void load()}
         rows={rows}
         getRowId={(r) => r.id}
         columns={[
           { key: "id", header: "Offer ID", sortable: true, accessor: (r) => r.id },
           { key: "seller", header: "Seller", sortable: true, accessor: (r) => r.seller },
           { key: "grade", header: "Grade", accessor: (r) => r.grade },
-          { key: "price", header: "Price", sortable: true, accessor: (r) => r.price, render: (r) => `₹${r.price}` },
+          { key: "price", header: "Selling Price", sortable: true, accessor: (r) => r.price, render: (r) => `₹${r.price}` },
           { key: "qty", header: "Quantity", sortable: true, accessor: (r) => r.quantity },
           { key: "validity", header: "Validity", render: (r) => formatDate(r.validity) },
           { key: "location", header: "Location", accessor: (r) => r.location },
@@ -58,8 +86,8 @@ export default function OffersPage() {
           <dl>
             <DetailRow label="Seller" value={r.seller} />
             <DetailRow label="Grade" value={r.grade} />
-            <DetailRow label="Price" value={`₹${r.price}`} />
-            <DetailRow label="Bulk price" value={`₹${r.bulkPrice}`} />
+            <DetailRow label="Selling price" value={`₹${r.price}`} />
+            <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice}`} />
             <DetailRow label="Remarks" value={r.remarks} />
             <DetailRow label="Location" value={r.location} />
             <DetailRow label="Validity" value={formatDate(r.validity)} />
@@ -81,11 +109,19 @@ export default function OffersPage() {
         title="Update offer"
         description="Offer status changes are Admin Portal actions and are written to the audit log."
         destructive={pending?.status === "Rejected"}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!pending) return;
-          updateOffer(pending.id, { status: pending.status });
-          pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Set offer ${pending.id} to ${pending.status}`, module: "Offers", entity: pending.id, result: "Success" });
-          toast.success("Offer updated");
+          try {
+            if (pending.status === "Active") await approveAdminOffer(pending.id);
+            else if (pending.status === "Rejected") await rejectAdminOffer(pending.id);
+            else if (pending.status === "Paused") await suspendAdminOffer(pending.id);
+            updateOffer(pending.id, { status: pending.status });
+            pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Set offer ${pending.id} to ${pending.status}`, module: "Offers", entity: pending.id, result: "Success" });
+            toast.success("Offer updated");
+            await load();
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to update offer.");
+          }
           setPending(null);
         }}
       />

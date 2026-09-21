@@ -8,10 +8,17 @@ import { ChartCard } from "@/components/shared/chart-card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { bannerKpis, STATUS_LABELS } from "@/lib/banner-utils";
 import { useBannerStore } from "@/store/banner-store";
+import { useEffect } from "react";
 
 export function CmsOverview() {
   const router = useRouter();
   const banners = useBannerStore((s) => s.banners);
+  const fetchBanners = useBannerStore((s) => s.fetchBanners);
+
+  useEffect(() => {
+    void fetchBanners();
+  }, [fetchBanners]);
+
   const kpis = bannerKpis(banners);
   const recent = [...banners].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4);
 

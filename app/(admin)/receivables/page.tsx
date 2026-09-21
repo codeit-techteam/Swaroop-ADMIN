@@ -1,10 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDate, formatInrExact } from "@/lib/format";
+import { listOutstandingCreditAccounts } from "@/lib/api/credit";
 import { useDataStore } from "@/store/data-store";
+import type { Receivable } from "@/types";
 
 function bucket(days: number) {
   if (days <= 0) return "Current";
@@ -14,12 +18,55 @@ function bucket(days: number) {
   return "90+";
 }
 
+function mapReceivable(account: Awaited<ReturnType<typeof listOutstandingCreditAccounts>>[number]): Receivable {
+  const outstanding = Number(account.outstandingAmount) || 0;
+  const overdue = Number(account.overdueAmount) || 0;
+  const utilized = Number(account.utilizedAmount) || 0;
+  return {
+    id: account.id,
+    customer: account.customer?.name ?? "Customer",
+    invoice: account.accountNumber ?? account.id,
+    invoiceDate: account.effectiveAt ?? account.createdAt,
+    dueDate: account.reviewAt ?? account.expiresAt ?? account.createdAt,
+    amount: Number(account.approvedLimit) || 0,
+    paid: Math.max(0, utilized - outstanding),
+    outstanding,
+    daysOverdue: overdue > 0 ? 1 : 0,
+    risk: overdue > 0 ? "High" : outstanding > 0 ? "Medium" : "Low",
+    status: overdue > 0 ? "Overdue" : outstanding > 0 ? "Due" : "Current",
+  };
+}
+
 export default function ReceivablesPage() {
   const rows = useDataStore((s) => s.receivables);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const accounts = await listOutstandingCreditAccounts();
+      useDataStore.setState({ receivables: accounts.map(mapReceivable) });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load receivables.");
+      useDataStore.setState({ receivables: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
   return (
     <EntityWorkbench
       title="Receivables"
-      description="Invoice aging and collection risk."
+      description="PetroTrade credit outstanding and collection risk from PostgreSQL."
+      loading={loading}
+      loadingError={loadError}
+      onRetry={() => void load()}
       kpis={[
         { label: "0-30", value: String(rows.filter((r) => bucket(r.daysOverdue) === "0-30").length) },
         { label: "31-60", value: String(rows.filter((r) => bucket(r.daysOverdue) === "31-60").length), tone: "warning" },
@@ -49,7 +96,7 @@ export default function ReceivablesPage() {
         { label: "Collected", value: "Collected", predicate: (r) => r.status === "Collected" },
       ]}
       emptyTitle="No receivables found."
-      emptyDescription="Invoices and outstanding balances will appear here."
+      emptyDescription="Outstanding PetroTrade credit balances will appear here."
       exportName="receivables"
       exportRow={(r) => ({ invoice: r.invoice, customer: r.customer, outstanding: r.outstanding, daysOverdue: r.daysOverdue })}
       drawerTitle={(r) => r.invoice}

@@ -67,7 +67,7 @@ export const adminNav: NavSection[] = [
     label: "FINANCE",
     items: [
       { href: "/payments", label: "Payments", icon: CreditCard },
-      { href: "/credit-insurance", label: "Credit Insurance", icon: ShieldAlert },
+      { href: "/credit", label: "Credit Management", icon: ShieldAlert },
       { href: "/receivables", label: "Receivables", icon: Wallet },
     ],
   },
@@ -103,6 +103,9 @@ export function isNavActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/procurement") {
     return pathname === "/procurement" || pathname.startsWith("/procurement/");
+  }
+  if (href === "/credit") {
+    return pathname === "/credit" || pathname.startsWith("/credit/");
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

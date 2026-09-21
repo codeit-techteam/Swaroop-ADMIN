@@ -7,8 +7,10 @@ import { DataTable, type SimpleColumn } from "@/components/shared/data-table";
 import { DetailDrawer } from "@/components/shared/detail-drawer";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { ErrorState, KpiSkeleton, TableSkeleton } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { downloadCsv } from "@/lib/csv";
 
 interface FilterDef<T> {
@@ -39,6 +41,9 @@ interface EntityWorkbenchProps<T> {
   initialSelectedId?: string | null;
   actions?: ReactNode;
   pageSize?: number;
+  loading?: boolean;
+  loadingError?: string | null;
+  onRetry?: () => void;
 }
 
 export function EntityWorkbench<T>({
@@ -63,6 +68,9 @@ export function EntityWorkbench<T>({
   initialSelectedId,
   actions,
   pageSize = 5,
+  loading = false,
+  loadingError,
+  onRetry,
 }: EntityWorkbenchProps<T>) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -84,27 +92,65 @@ export function EntityWorkbench<T>({
 
   const selected = rows.find((row) => getRowId(row) === selectedId) ?? null;
 
+  const header = (
+    <PageHeader
+      title={title}
+      description={description}
+      breadcrumbs={breadcrumbs}
+      actions={
+        <>
+          {actions}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => downloadCsv(`${exportName}.csv`, filtered.map(exportRow))}
+          >
+            <Download className="size-3.5" />
+            Export
+          </Button>
+        </>
+      }
+    />
+  );
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5" aria-busy="true">
+        {header}
+        {kpis ? <KpiSkeleton count={kpis.length > 0 ? kpis.length : 4} /> : null}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <Skeleton className="h-9 w-full max-w-md" />
+          {filters ? (
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: filters.length + 1 }).map((_, index) => (
+                <Skeleton key={index} className="h-8 w-16" />
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <TableSkeleton />
+      </div>
+    );
+  }
+
+  if (loadingError) {
+    return (
+      <div className="flex flex-col gap-5">
+        {header}
+        <ErrorState
+          title="Unable to load this module"
+          description={loadingError}
+          onRetry={onRetry}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title={title}
-        description={description}
-        breadcrumbs={breadcrumbs}
-        actions={
-          <>
-            {actions}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => downloadCsv(`${exportName}.csv`, filtered.map(exportRow))}
-            >
-              <Download className="size-3.5" />
-              Export
-            </Button>
-          </>
-        }
-      />
+      {header}
       {kpis && kpis.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((kpi) => (

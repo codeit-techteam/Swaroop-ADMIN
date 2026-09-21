@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -10,6 +10,7 @@ import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatInr } from "@/lib/format";
+import { listAdminSellers, suspendAdminSeller } from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 
@@ -19,12 +20,34 @@ export default function SellersPage() {
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      useDataStore.setState({ sellers: await listAdminSellers() });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load sellers.");
+      useDataStore.setState({ sellers: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
     <>
       <EntityWorkbench
         title="Sellers"
         description="Admin tracking of Seller Mobile App and Seller Web App — this is not the Seller Portal."
+        loading={loading}
+        loadingError={loadError}
+        onRetry={() => void load()}
         breadcrumbs={[{ label: "Ecosystem" }, { label: "Sellers" }]}
         kpis={[
           { label: "Active sellers", value: String(rows.filter((r) => r.status === "Active").length) },
@@ -82,11 +105,16 @@ export default function SellersPage() {
         description="The seller will lose marketplace access until reactivated. This does not log you into the Seller Portal."
         confirmLabel="Deactivate"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!deactivateId) return;
-          updateSeller(deactivateId, { status: "Suspended" });
-          pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Deactivated seller ${deactivateId}`, module: "Sellers", entity: deactivateId, result: "Success" });
-          toast.success("Seller deactivated");
+          try {
+            await suspendAdminSeller(deactivateId);
+            updateSeller(deactivateId, { status: "Suspended" });
+            pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Deactivated seller ${deactivateId}`, module: "Sellers", entity: deactivateId, result: "Success" });
+            toast.success("Seller deactivated");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to deactivate seller.");
+          }
           setDeactivateId(null);
         }}
       />
