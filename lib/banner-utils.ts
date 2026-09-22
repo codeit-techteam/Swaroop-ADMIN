@@ -348,6 +348,10 @@ export function validateBannerForm(
   const errors: BannerFormErrors = {};
   if (!values.name.trim()) errors.name = "Banner name is required.";
   if (!values.desktopImage && !values.mobileImage) errors.creative = "Upload a desktop or mobile creative.";
+  const creative = values.desktopImage || values.mobileImage;
+  if (creative && (creative.startsWith("data:") || creative.startsWith("blob:"))) {
+    errors.creative = "Upload the file or paste a public HTTPS image URL before saving.";
+  }
   if (values.platforms.length === 0) errors.platforms = "Select at least one platform.";
   if (values.placements.length === 0) errors.placements = "Select at least one placement.";
   if (!values.headline.trim()) errors.headline = "Headline is required.";

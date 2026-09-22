@@ -1,5 +1,6 @@
 import {
   ctrPercent,
+  deriveBannerStatus,
   duplicateBannerName,
   getCustomerAppBanners as filterCustomerApp,
   getCustomerBanners as filterCustomer,
@@ -31,7 +32,10 @@ type CmsBanner = {
   startAt?: string | null;
   endAt?: string | null;
   mediaKey?: string | null;
+  mediaUrl?: string | null;
   targetRoute?: string | null;
+  impressionCount?: number;
+  clickCount?: number;
   metadata?: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
@@ -40,38 +44,75 @@ type CmsBanner = {
 
 let cache: Banner[] = [];
 
-function pad(value: number) {
-  return String(value).padStart(2, "0");
-}
-
 function splitIso(value?: string | null) {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) {
     const now = new Date();
     return {
-      date: now.toISOString().slice(0, 10),
-      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      date: now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
+      time: now.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Kolkata",
+      }),
     };
   }
   return {
-    date: date.toISOString().slice(0, 10),
-    time: `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`,
+    date: date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
+    time: date.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Kolkata",
+    }),
   };
 }
 
-function asStatus(value?: string): BannerStatus {
-  if (value === "ACTIVE" || value === "PAUSED" || value === "EXPIRED" || value === "DRAFT") {
-    return value;
-  }
-  if (value === "ARCHIVED") return "EXPIRED";
-  return "DRAFT";
+function asStatus(row: CmsBanner): BannerStatus {
+  const value = row.status;
+  if (value === "PAUSED") return "PAUSED";
+  if (value === "EXPIRED" || value === "ARCHIVED") return "EXPIRED";
+  if (value === "DRAFT") return "DRAFT";
+  const start = splitIso(row.startAt);
+  const end = splitIso(row.endAt);
+  const derived = deriveBannerStatus({
+    startDate: start.date,
+    startTime: start.time,
+    endDate: end.date,
+    endTime: end.time,
+  });
+  if (derived === "SCHEDULED" || derived === "EXPIRED") return derived;
+  return "ACTIVE";
 }
 
-function asPlatform(value?: string): BannerPlatform {
-  if (value === "CUSTOMER_WEB" || value === "SELLER_APP" || value === "SELLER_WEB") {
-    return value;
+function asPlatforms(row: CmsBanner): BannerPlatform[] {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  if (Array.isArray(meta.platforms) && meta.platforms.length) {
+    const mapped = meta.platforms.filter((item): item is BannerPlatform =>
+      item === "CUSTOMER_APP" ||
+      item === "CUSTOMER_WEB" ||
+      item === "SELLER_APP" ||
+      item === "SELLER_WEB",
+    );
+    if (mapped.length) return mapped;
   }
-  return "CUSTOMER_APP";
+  switch (row.platform) {
+    case "CUSTOMER_WEB":
+      return ["CUSTOMER_WEB"];
+    case "CUSTOMER_ALL":
+      return ["CUSTOMER_APP", "CUSTOMER_WEB"];
+    case "SELLER_APP":
+      return ["SELLER_APP"];
+    case "SELLER_WEB":
+      return ["SELLER_WEB"];
+    case "SELLER_ALL":
+      return ["SELLER_APP", "SELLER_WEB"];
+    case "ALL":
+      return ["CUSTOMER_APP", "CUSTOMER_WEB", "SELLER_APP", "SELLER_WEB"];
+    default:
+      return ["CUSTOMER_APP"];
+  }
 }
 
 function asPlacement(value?: string): BannerPlacement {
@@ -100,54 +141,85 @@ function asPlacement(value?: string): BannerPlacement {
 function cmsPlacement(value?: string) {
   switch (value) {
     case "HOME_HERO":
+    case "HOME_PROMOTIONAL":
+      return "HOME_HERO";
     case "MARKETPLACE":
-    case "DASHBOARD":
+    case "PRODUCT_LISTING":
+    case "PRODUCT_DETAIL":
+    case "SELLER_MARKETPLACE":
+      return "MARKETPLACE";
     case "OFFERS":
+    case "MY_OFFERS":
+      return "OFFERS";
     case "LOGIN":
-    case "OTHER":
-      return value;
+      return "LOGIN";
+    case "DASHBOARD":
+    case "ORDERS":
+    case "SELLER_DASHBOARD":
+    case "SELLER_DASHBOARD_PROMOTIONAL":
+    case "SELLER_ORDERS":
+    case "DISPATCH":
+    case "SETTLEMENT":
+      return "DASHBOARD";
     default:
       return "OTHER";
   }
 }
 
 function cmsStatus(value?: BannerStatus) {
-  if (value === "ACTIVE" || value === "PAUSED" || value === "EXPIRED") return value;
+  if (value === "PAUSED" || value === "EXPIRED") return value;
+  if (value === "ACTIVE" || value === "SCHEDULED") return "ACTIVE";
   return "DRAFT";
+}
+
+function cmsPlatform(platforms?: BannerPlatform[]) {
+  const unique = [...new Set(platforms ?? [])];
+  const customer = unique.filter((item) => item === "CUSTOMER_APP" || item === "CUSTOMER_WEB");
+  const seller = unique.filter((item) => item === "SELLER_APP" || item === "SELLER_WEB");
+  if (customer.length && seller.length) return "ALL";
+  if (customer.length === 2) return "CUSTOMER_ALL";
+  if (seller.length === 2) return "SELLER_ALL";
+  return unique[0] ?? "CUSTOMER_APP";
+}
+
+function isTransientMedia(value?: string) {
+  return Boolean(value && (value.startsWith("data:") || value.startsWith("blob:")));
 }
 
 function mapBanner(row: CmsBanner): Banner {
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
   const start = splitIso(row.startAt);
   const end = splitIso(row.endAt);
-  const platform = asPlatform(String(meta.platform ?? row.platform ?? "CUSTOMER_APP"));
+  const image = row.mediaUrl ?? row.mediaKey ?? undefined;
+  const impressions = Number(row.impressionCount ?? meta.impressions) || 0;
+  const clicks = Number(row.clickCount ?? meta.clicks) || 0;
   return {
     id: row.id,
     name: String(meta.name ?? row.title),
     campaignName: String(meta.campaignName ?? row.title),
     description: String(meta.description ?? row.subtitle ?? ""),
     campaignType: (meta.campaignType as CampaignType) || "INFORMATIONAL",
-    platforms: [platform],
+    platforms: asPlatforms(row),
     placements: [asPlacement(String(meta.placement ?? row.placement ?? "HOME_HERO"))],
-    desktopImage: row.mediaKey ?? undefined,
-    mobileImage: row.mediaKey ?? undefined,
+    desktopImage: image,
+    mobileImage: typeof meta.mobileImage === "string" ? meta.mobileImage : image,
     headline: row.title,
     subheadline: row.subtitle ?? undefined,
     ctaText: String(meta.ctaText ?? "View"),
     ctaAction: (meta.ctaAction as CtaAction) || "NO_ACTION",
-    targetId: row.targetRoute ?? undefined,
+    targetId: String(meta.targetId ?? row.targetRoute ?? ""),
     externalUrl: typeof meta.externalUrl === "string" ? meta.externalUrl : undefined,
     startDate: start.date,
     startTime: start.time,
     endDate: end.date,
     endTime: end.time,
     timezone: "Asia/Kolkata",
-    status: asStatus(row.status),
+    status: asStatus(row),
     priority: (Number(meta.priority) || 3) as BannerPriority,
     displayOrder: row.displayOrder ?? 0,
-    impressions: Number(meta.impressions) || 0,
-    clicks: Number(meta.clicks) || 0,
-    ctr: Number(meta.ctr) || 0,
+    impressions,
+    clicks,
+    ctr: ctrPercent(impressions, clicks),
     createdBy: String(meta.createdBy ?? "Admin"),
     createdAt: row.createdAt ?? new Date().toISOString(),
     updatedAt: row.updatedAt ?? new Date().toISOString(),
@@ -159,8 +231,11 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
   const startTime = "startTime" in input ? input.startTime : undefined;
   const endDate = "endDate" in input ? input.endDate : undefined;
   const endTime = "endTime" in input ? input.endTime : undefined;
-  const platform = input.platforms?.[0] ?? "CUSTOMER_APP";
+  const platforms = input.platforms ?? [];
+  const platform = cmsPlatform(platforms);
   const placement = input.placements?.[0] ?? "HOME_HERO";
+  const desktop = isTransientMedia(input.desktopImage) ? undefined : input.desktopImage;
+  const mobile = isTransientMedia(input.mobileImage) ? undefined : input.mobileImage;
   return {
     title: input.headline ?? input.name ?? "Banner",
     subtitle: input.subheadline ?? input.description,
@@ -168,24 +243,24 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
     platform,
     status: cmsStatus(input.status),
     displayOrder: input.displayOrder,
-    startAt: startDate ? `${startDate}T${startTime || "00:00"}:00.000Z` : undefined,
-    endAt: endDate ? `${endDate}T${endTime || "23:59"}:00.000Z` : undefined,
-    mediaKey: input.desktopImage ?? input.mobileImage,
-    targetRoute: input.targetId ?? input.externalUrl,
+    startAt: startDate ? `${startDate}T${startTime || "00:00"}:00+05:30` : undefined,
+    endAt: endDate ? `${endDate}T${endTime || "23:59"}:00+05:30` : undefined,
+    mediaKey: desktop ?? mobile,
+    targetRoute: input.targetId || input.externalUrl,
     metadata: {
       name: input.name,
       campaignName: input.campaignName,
       description: input.description,
       campaignType: input.campaignType,
+      platforms,
       platform,
       placement,
       ctaText: input.ctaText,
       ctaAction: input.ctaAction,
+      targetId: input.targetId,
       priority: input.priority,
       createdBy: actor,
-      impressions: "impressions" in input ? input.impressions : 0,
-      clicks: "clicks" in input ? input.clicks : 0,
-      ctr: "ctr" in input ? input.ctr : 0,
+      mobileImage: mobile,
       externalUrl: input.externalUrl,
     },
   };
@@ -361,6 +436,30 @@ export function getPlatformBanners(platform: BannerPlatform, placement?: BannerP
   }
 }
 
+export async function uploadBannerCreative(file: File): Promise<string> {
+  const { data } = await apiRequest<{
+    mediaKey: string;
+    uploadUrl: string;
+    mediaUrl?: string | null;
+  }>("/admin/cms/banners/media-upload", {
+    method: "POST",
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || "image/jpeg",
+      fileSizeBytes: file.size,
+    }),
+  });
+  const uploaded = await fetch(data.uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type || "image/jpeg" },
+  });
+  if (!uploaded.ok) {
+    throw new Error("Could not upload the banner creative.");
+  }
+  return data.mediaUrl || data.mediaKey;
+}
+
 export const bannerApi = {
   getBanners,
   getBannersSync,
@@ -376,6 +475,7 @@ export const bannerApi = {
   bulkActivate,
   bulkPause,
   bulkChangePriority,
+  uploadBannerCreative,
   getCustomerBanners,
   getSellerBanners,
   getCustomerAppBanners,
