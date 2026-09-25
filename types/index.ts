@@ -99,6 +99,7 @@ export interface ProductGrade {
 
 export interface Offer {
   id: string;
+  offerNumber?: string;
   sellerId: string;
   seller: string;
   grade: string;
@@ -203,6 +204,30 @@ export interface Dispute {
   status: "Open" | "Investigating" | "Awaiting Info" | "Resolved" | "Rejected";
   createdAt: string;
   assignedTo: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber: string;
+  requesterType: "Customer" | "Seller";
+  requesterName: string;
+  organizationName: string;
+  category: string;
+  subject: string;
+  description: string;
+  priority: "Low" | "Medium" | "High" | "Critical";
+  status: "Open" | "In Progress" | "Waiting" | "Resolved" | "Closed";
+  assignedTo: string;
+  createdAt: string;
+  updatedAt: string;
+  source: AppSource;
+  messages: Array<{
+    id: string;
+    sender: string;
+    senderName: string;
+    body: string;
+    createdAt: string;
+  }>;
 }
 
 export interface KycRecord {

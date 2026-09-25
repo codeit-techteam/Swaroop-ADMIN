@@ -29,15 +29,29 @@ export function creditErrorMessage(error: unknown, fallback: string) {
 }
 
 export const APPLICATION_STATUSES = [
+  "DRAFT",
   "PENDING",
+  "DOCUMENTS_UNDER_REVIEW",
   "UNDER_REVIEW",
   "DOCUMENTS_REQUIRED",
+  "INSURANCE_REVIEW",
+  "CREDIT_ARRANGEMENT_PENDING",
   "APPROVED",
+  "PARTIALLY_APPROVED",
   "REJECTED",
+  "EXPIRED",
   "CANCELLED",
 ] as const;
 
 export const ACCOUNT_STATUSES = ["ACTIVE", "SUSPENDED", "BLOCKED", "EXPIRED", "CLOSED"] as const;
+
+export function humanizeCreditStatus(value: string | null | undefined) {
+  if (!value) return "—";
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export function humanizeCreditAction(action: string) {
   return action

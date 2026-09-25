@@ -1,7 +1,7 @@
 "use client";
 
 import { ImagePlus, Link2, Loader2, Replace, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { uploadBannerCreative } from "@/lib/api/banners";
@@ -12,8 +12,11 @@ import { cn } from "@/lib/utils";
 interface CreativeUploadProps {
   label: string;
   hint: string;
+  /** Browser-loadable preview (HTTPS / data). */
   value?: string;
-  onChange: (dataUrl?: string) => void;
+  /** Durable R2 object key (or HTTPS paste) persisted to CmsBanner.mediaKey. */
+  storageKey?: string;
+  onChange: (next: { previewUrl?: string; storageKey?: string }) => void;
   aspectClassName?: string;
 }
 
@@ -25,12 +28,23 @@ export function CreativeUpload({
   label,
   hint,
   value,
+  storageKey,
   onChange,
   aspectClassName = "aspect-[16/5]",
 }: CreativeUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [urlDraft, setUrlDraft] = useState("");
+  const [localPreview, setLocalPreview] = useState<string | undefined>();
+
+  useEffect(() => {
+    setLocalPreview(undefined);
+  }, [value, storageKey]);
+
+  const previewSrc =
+    localPreview ||
+    (isHttpUrl(value) ? value : undefined) ||
+    (isHttpUrl(storageKey) ? storageKey : undefined);
 
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
@@ -46,13 +60,16 @@ export function CreativeUpload({
 
     setUploading(true);
     try {
-      const mediaUrl = await uploadBannerCreative(file);
-      onChange(mediaUrl);
-      toast.success("Creative uploaded.");
+      const { mediaKey, mediaUrl } = await uploadBannerCreative(file);
+      setLocalPreview(mediaUrl);
+      onChange({ previewUrl: mediaUrl, storageKey: mediaKey });
+      toast.success("Creative uploaded to storage.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed.";
       if (message.toLowerCase().includes("storage") || message.includes("503")) {
-        toast.error("Object storage is not configured. Paste a public HTTPS image URL instead.");
+        toast.error(
+          "Object storage is not configured. Paste a public HTTPS image URL instead.",
+        );
       } else {
         toast.error(message);
       }
@@ -67,7 +84,8 @@ export function CreativeUpload({
       toast.error("Enter a valid https:// image URL.");
       return;
     }
-    onChange(next);
+    setLocalPreview(next);
+    onChange({ previewUrl: next, storageKey: next });
     setUrlDraft("");
     toast.success("Image URL attached.");
   }
@@ -78,10 +96,25 @@ export function CreativeUpload({
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{hint}</p>
       </div>
-      {value ? (
+      {previewSrc || storageKey ? (
         <div className="overflow-hidden rounded-md border bg-slate-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt={label} className={cn("w-full object-cover", aspectClassName)} />
+          {previewSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewSrc}
+              alt={label}
+              className={cn("w-full object-cover", aspectClassName)}
+            />
+          ) : (
+            <div
+              className={cn(
+                "flex items-center justify-center bg-slate-100 text-xs text-muted-foreground",
+                aspectClassName,
+              )}
+            >
+              Uploaded · key saved
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 border-t bg-white p-2">
             <Button
               type="button"
@@ -90,10 +123,22 @@ export function CreativeUpload({
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Replace className="size-3.5" />}
+              {uploading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Replace className="size-3.5" />
+              )}
               Replace
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => onChange(undefined)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setLocalPreview(undefined);
+                onChange({});
+              }}
+            >
               <Trash2 className="size-3.5" />
               Remove
             </Button>
@@ -122,7 +167,9 @@ export function CreativeUpload({
           <p className="text-sm font-medium">
             {uploading ? "Uploading creative…" : "Drag & drop or browse files"}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WebP · max 5 MB</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            PNG, JPG, WebP · max 5 MB · stored on R2
+          </p>
         </button>
       )}
       <div className="flex gap-2">

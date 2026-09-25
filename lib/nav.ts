@@ -14,6 +14,7 @@ import {
   PackageSearch,
   Scale,
   Settings,
+  Headset,
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
@@ -76,6 +77,7 @@ export const adminNav: NavSection[] = [
     items: [
       { href: "/logistics", label: "Logistics", icon: Truck },
       { href: "/logistics/bulk-quotes", label: "Bulk Logistics Quotes", icon: ClipboardCheck },
+      { href: "/support", label: "Support Tickets", icon: Headset },
       { href: "/disputes", label: "Disputes", icon: Scale },
     ],
   },

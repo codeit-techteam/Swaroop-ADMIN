@@ -108,17 +108,31 @@ export function mapAdminOffer(row: Record<string, unknown>): Offer {
   const org = (row.organization ?? {}) as Record<string, unknown>;
   const grade = (row.grade ?? {}) as Record<string, unknown>;
   const product = (row.product ?? {}) as Record<string, unknown>;
+  const warehouse = (row.warehouse ?? {}) as Record<string, unknown>;
+  const count = (row._count ?? {}) as Record<string, unknown>;
   return {
     id: String(row.id),
+    offerNumber: row.referenceNumber ? String(row.referenceNumber) : undefined,
     sellerId: String(row.organizationId ?? org.id ?? ""),
     seller: String(org.legalName ?? org.name ?? "Seller"),
-    grade: String(grade.code ?? grade.name ?? product.name ?? "Grade"),
+    grade: String(
+      product.name ?? grade.displayName ?? grade.code ?? grade.name ?? "Grade",
+    ),
     price: num(row.basePrice),
     bulkPrice: num(row.basePrice),
     quantity: num(row.quantity),
     validity: iso(row.validUntil ?? row.createdAt),
-    location: String(row.deliveryTerms ?? "Assigned hub"),
-    remarks: String(row.notes ?? ""),
+    location: String(
+      warehouse.name ??
+        warehouse.city ??
+        row.deliveryTerms ??
+        "Assigned hub",
+    ),
+    remarks: String(
+      count.purchaseRequestItems != null
+        ? `PRs: ${count.purchaseRequestItems}`
+        : (row.notes ?? ""),
+    ),
     status: mapOfferStatus(String(row.status ?? "")),
     source: "Seller Web",
     updatedAt: iso(row.updatedAt ?? row.createdAt),
@@ -234,6 +248,11 @@ export async function listAdminOffers() {
   return rows.map(mapAdminOffer);
 }
 
+export async function fetchAdminOfferSummary() {
+  const { data } = await apiRequest<Record<string, number>>("/admin/offers/summary");
+  return data ?? {};
+}
+
 export async function approveAdminOffer(id: string) {
   await apiRequest(`/admin/offers/${id}/approve`, { method: "POST", body: JSON.stringify({}) });
 }
@@ -311,17 +330,17 @@ function mapDocumentCategory(category?: string): PlatformDocument["category"] {
   const key = (category ?? "").toUpperCase();
   if (key.includes("GST")) return "GST";
   if (key.includes("PAN")) return "PAN";
+  if (key.includes("AADHAAR") || key.includes("KYC")) return "KYC";
   if (key.includes("BANK")) return "Bank";
   if (key.includes("PO") || key.includes("PURCHASE")) return "Purchase Orders";
   if (key.includes("INVOICE")) return "Invoices";
   if (key.includes("EWAY") || key.includes("E-WAY")) return "E-way Bills";
   if (key.includes("DELIV") || key.includes("POD")) return "Delivery Documents";
-  if (key.includes("KYC")) return "KYC";
   return "Compliance";
 }
 
 function mapDocumentStatus(status?: string): PlatformDocument["status"] {
-  switch (status) {
+  switch ((status ?? "").toUpperCase()) {
     case "APPROVED":
     case "VERIFIED":
       return "Verified";
@@ -329,22 +348,80 @@ function mapDocumentStatus(status?: string): PlatformDocument["status"] {
       return "Rejected";
     case "REVISION_REQUESTED":
       return "Revision Requested";
+    case "UNDER_REVIEW":
+    case "UPLOADED":
+    case "REPLACED":
     default:
       return "Pending";
   }
 }
 
+const ONBOARDING_SLOT_LABELS: Record<string, string> = {
+  gst: "GST Certificate",
+  pan: "PAN Card",
+  aadhaar: "Aadhaar",
+  cancelledCheque: "Cancelled Cheque",
+};
+
 export function mapAdminDocument(row: Record<string, unknown>): PlatformDocument {
   const org = (row.organization ?? {}) as Record<string, unknown>;
+  const meta =
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)
+      : {};
+  const slot = typeof meta.slot === "string" ? meta.slot : "";
+  const purpose = typeof meta.purpose === "string" ? meta.purpose : "";
+  const slotLabel = slot ? ONBOARDING_SLOT_LABELS[slot] : undefined;
+  const fileName = String(
+    row.originalFileName ?? row.fileName ?? row.documentNumber ?? "Document",
+  );
+  const ownerType = String(row.ownerType ?? "").toUpperCase();
+  const source: PlatformDocument["source"] =
+    purpose === "SELLER_ONBOARDING" ||
+    purpose === "SELLER_PANEL" ||
+    ownerType === "SELLER"
+      ? "Seller Web"
+      : ownerType === "CUSTOMER"
+        ? "Customer Web"
+        : "Admin Portal";
+
   return {
     id: String(row.id),
-    name: String(row.originalFileName ?? row.fileName ?? row.documentNumber ?? "Document"),
+    name: slotLabel ? `${slotLabel} (${fileName})` : fileName,
     category: mapDocumentCategory(String(row.category ?? "")),
     entity: String(org.legalName ?? org.name ?? "Organization"),
-    uploadedAt: iso(row.createdAt),
+    uploadedAt: iso(row.uploadedAt ?? row.createdAt),
     status: mapDocumentStatus(String(row.status ?? "")),
-    source: "Admin Portal",
+    source,
   };
+}
+
+export async function listAdminDocuments() {
+  const rows = await listAll<Record<string, unknown>>("/admin/documents");
+  return rows.map(mapAdminDocument);
+}
+
+export async function approveAdminDocument(id: string, notes?: string) {
+  await apiRequest(`/admin/documents/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ notes: notes ?? "Verified by compliance admin" }),
+  });
+}
+
+export async function rejectAdminDocument(id: string, reason: string) {
+  await apiRequest(`/admin/documents/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function downloadAdminDocument(id: string) {
+  const { data } = await apiRequest<{
+    url: string;
+    fileName?: string;
+    mimeType?: string;
+  }>(`/admin/documents/${id}/download`);
+  return data;
 }
 
 function mapProcurementStatus(status?: string): Procurement["status"] {
@@ -425,11 +502,6 @@ export async function listAdminKyc() {
   return [...sellerKyc, ...customerKyc];
 }
 
-export async function listAdminDocuments() {
-  const rows = await listAll<Record<string, unknown>>("/admin/documents");
-  return rows.map(mapAdminDocument);
-}
-
 export async function listAdminProcurements() {
   const rows = await listAll<Record<string, unknown>>("/admin/purchase-requests");
   return rows.map(mapAdminProcurement);
@@ -477,4 +549,96 @@ export async function getAdminSalesReport() {
     byStatus: Array<{ status: string; count: number; totalAmount: string }>;
   }>("/admin/reports/sales");
   return data;
+}
+
+function mapSupportStatus(status?: string): import("@/types").SupportTicket["status"] {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "WAITING_CUSTOMER":
+      return "Waiting";
+    case "RESOLVED":
+      return "Resolved";
+    case "CLOSED":
+      return "Closed";
+    default:
+      return "Open";
+  }
+}
+
+function mapSupportPriority(priority?: string): import("@/types").SupportTicket["priority"] {
+  switch (priority) {
+    case "LOW":
+      return "Low";
+    case "HIGH":
+      return "High";
+    case "CRITICAL":
+      return "Critical";
+    default:
+      return "Medium";
+  }
+}
+
+function mapSupportTicket(row: Record<string, unknown>): import("@/types").SupportTicket {
+  const requesterType = String(row.requesterType ?? "CUSTOMER") === "SELLER" ? "Seller" : "Customer";
+  const source: import("@/types").AppSource =
+    requesterType === "Seller" ? "Seller Web" : "Customer Web";
+  const messages = Array.isArray(row.messages) ? row.messages : [];
+  return {
+    id: String(row.id),
+    ticketNumber: String(row.ticketNumber ?? row.ticketId ?? row.id),
+    requesterType,
+    requesterName: String(row.requesterName ?? "—"),
+    organizationName: String(row.organizationName ?? "—"),
+    category: String(row.categoryLabel ?? row.category ?? "Other"),
+    subject: String(row.subject ?? ""),
+    description: String(row.description ?? ""),
+    priority: mapSupportPriority(String(row.priority ?? "MEDIUM")),
+    status: mapSupportStatus(String(row.status ?? "OPEN")),
+    assignedTo: String(row.assignedToName ?? "Unassigned"),
+    createdAt: iso(row.createdAt),
+    updatedAt: iso(row.updatedAt),
+    source,
+    messages: messages.map((m) => {
+      const msg = m as Record<string, unknown>;
+      return {
+        id: String(msg.id),
+        sender: String(msg.sender ?? ""),
+        senderName: String(msg.senderName ?? ""),
+        body: String(msg.body ?? ""),
+        createdAt: iso(msg.createdAt),
+      };
+    }),
+  };
+}
+
+export async function listAdminSupportTickets() {
+  const rows = await listAll<Record<string, unknown>>("/admin/support/tickets");
+  return rows.map(mapSupportTicket);
+}
+
+export async function updateAdminSupportTicketStatus(
+  id: string,
+  status: "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED",
+  note?: string,
+) {
+  const { data } = await apiRequest<Record<string, unknown>>(
+    `/admin/support/tickets/${id}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status, note }),
+    },
+  );
+  return mapSupportTicket(data as Record<string, unknown>);
+}
+
+export async function replyAdminSupportTicket(id: string, body: string) {
+  const { data } = await apiRequest<Record<string, unknown>>(
+    `/admin/support/tickets/${id}/reply`,
+    {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    },
+  );
+  return mapSupportTicket(data as Record<string, unknown>);
 }

@@ -186,11 +186,33 @@ function isTransientMedia(value?: string) {
   return Boolean(value && (value.startsWith("data:") || value.startsWith("blob:")));
 }
 
+function persistableMediaRef(
+  storageKey?: string,
+  previewOrUrl?: string,
+): string | undefined {
+  if (storageKey && !isTransientMedia(storageKey)) return storageKey;
+  if (previewOrUrl && !isTransientMedia(previewOrUrl)) return previewOrUrl;
+  return undefined;
+}
+
 function mapBanner(row: CmsBanner): Banner {
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
   const start = splitIso(row.startAt);
   const end = splitIso(row.endAt);
-  const image = row.mediaUrl ?? row.mediaKey ?? undefined;
+  // Always keep the raw object key for re-save; use resolved URL for UI preview.
+  const storageKey =
+    typeof row.mediaKey === "string" && row.mediaKey.trim()
+      ? row.mediaKey.trim()
+      : undefined;
+  const preview = row.mediaUrl ?? storageKey ?? undefined;
+  const mobileStorage =
+    typeof meta.mobileImage === "string" && meta.mobileImage.trim()
+      ? meta.mobileImage.trim()
+      : storageKey;
+  const mobilePreview =
+    typeof meta.mobileImageUrl === "string"
+      ? meta.mobileImageUrl
+      : mobileStorage;
   const impressions = Number(row.impressionCount ?? meta.impressions) || 0;
   const clicks = Number(row.clickCount ?? meta.clicks) || 0;
   return {
@@ -201,8 +223,10 @@ function mapBanner(row: CmsBanner): Banner {
     campaignType: (meta.campaignType as CampaignType) || "INFORMATIONAL",
     platforms: asPlatforms(row),
     placements: [asPlacement(String(meta.placement ?? row.placement ?? "HOME_HERO"))],
-    desktopImage: image,
-    mobileImage: typeof meta.mobileImage === "string" ? meta.mobileImage : image,
+    desktopImage: preview,
+    mobileImage: mobilePreview ?? preview,
+    desktopMediaId: storageKey,
+    mobileMediaId: mobileStorage,
     headline: row.title,
     subheadline: row.subtitle ?? undefined,
     ctaText: String(meta.ctaText ?? "View"),
@@ -234,8 +258,8 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
   const platforms = input.platforms ?? [];
   const platform = cmsPlatform(platforms);
   const placement = input.placements?.[0] ?? "HOME_HERO";
-  const desktop = isTransientMedia(input.desktopImage) ? undefined : input.desktopImage;
-  const mobile = isTransientMedia(input.mobileImage) ? undefined : input.mobileImage;
+  const desktop = persistableMediaRef(input.desktopMediaId, input.desktopImage);
+  const mobile = persistableMediaRef(input.mobileMediaId, input.mobileImage);
   return {
     title: input.headline ?? input.name ?? "Banner",
     subtitle: input.subheadline ?? input.description,
@@ -245,6 +269,7 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
     displayOrder: input.displayOrder,
     startAt: startDate ? `${startDate}T${startTime || "00:00"}:00+05:30` : undefined,
     endAt: endDate ? `${endDate}T${endTime || "23:59"}:00+05:30` : undefined,
+    // Persist R2 object key (or stable HTTPS URL) — never a short-lived signed URL alone.
     mediaKey: desktop ?? mobile,
     targetRoute: input.targetId || input.externalUrl,
     metadata: {
@@ -260,7 +285,7 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
       targetId: input.targetId,
       priority: input.priority,
       createdBy: actor,
-      mobileImage: mobile,
+      mobileImage: mobile ?? desktop,
       externalUrl: input.externalUrl,
     },
   };
@@ -436,7 +461,13 @@ export function getPlatformBanners(platform: BannerPlatform, placement?: BannerP
   }
 }
 
-export async function uploadBannerCreative(file: File): Promise<string> {
+/**
+ * Upload a banner creative to R2 via a signed PUT URL.
+ * Returns the durable object key for DB persistence plus a preview URL for the form.
+ */
+export async function uploadBannerCreative(
+  file: File,
+): Promise<{ mediaKey: string; mediaUrl: string }> {
   const { data } = await apiRequest<{
     mediaKey: string;
     uploadUrl: string;
@@ -457,7 +488,12 @@ export async function uploadBannerCreative(file: File): Promise<string> {
   if (!uploaded.ok) {
     throw new Error("Could not upload the banner creative.");
   }
-  return data.mediaUrl || data.mediaKey;
+  // Always persist mediaKey (R2 object key). mediaUrl is for UI preview only —
+  // signed GET URLs expire; storing them as mediaKey breaks customer apps.
+  return {
+    mediaKey: data.mediaKey,
+    mediaUrl: data.mediaUrl || data.mediaKey,
+  };
 }
 
 export const bannerApi = {

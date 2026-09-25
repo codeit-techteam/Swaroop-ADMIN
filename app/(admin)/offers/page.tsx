@@ -57,18 +57,18 @@ export default function OffersPage() {
         rows={rows}
         getRowId={(r) => r.id}
         columns={[
-          { key: "id", header: "Offer ID", sortable: true, accessor: (r) => r.id },
+          { key: "id", header: "Offer #", sortable: true, accessor: (r) => r.offerNumber ?? r.id },
           { key: "seller", header: "Seller", sortable: true, accessor: (r) => r.seller },
           { key: "grade", header: "Grade", accessor: (r) => r.grade },
           { key: "price", header: "Selling Price", sortable: true, accessor: (r) => r.price, render: (r) => `₹${r.price}` },
           { key: "qty", header: "Quantity", sortable: true, accessor: (r) => r.quantity },
           { key: "validity", header: "Validity", render: (r) => formatDate(r.validity) },
-          { key: "location", header: "Location", accessor: (r) => r.location },
+          { key: "location", header: "Warehouse", accessor: (r) => r.location },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
           { key: "source", header: "Source", render: (r) => <SourceBadge source={r.source} /> },
         ]}
         searchPlaceholder="Search offers"
-        searchFn={(r, q) => `${r.id} ${r.seller} ${r.grade} ${r.location}`.toLowerCase().includes(q)}
+        searchFn={(r, q) => `${r.offerNumber ?? ""} ${r.id} ${r.seller} ${r.grade} ${r.location}`.toLowerCase().includes(q)}
         filters={[
           { label: "Draft", value: "Draft", predicate: (r) => r.status === "Draft" },
           { label: "Pending Review", value: "Pending Review", predicate: (r) => r.status === "Pending Review" },
@@ -81,15 +81,16 @@ export default function OffersPage() {
         emptyDescription="Seller offers from Seller App and Seller Web App will appear here."
         exportName="offers"
         exportRow={(r) => ({ id: r.id, seller: r.seller, grade: r.grade, status: r.status, source: r.source })}
-        drawerTitle={(r) => r.id}
+        drawerTitle={(r) => r.offerNumber ?? r.id}
         renderDetails={(r) => (
           <dl>
+            <DetailRow label="Offer #" value={r.offerNumber ?? r.id} />
             <DetailRow label="Seller" value={r.seller} />
             <DetailRow label="Grade" value={r.grade} />
             <DetailRow label="Selling price" value={`₹${r.price}`} />
             <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice}`} />
             <DetailRow label="Remarks" value={r.remarks} />
-            <DetailRow label="Location" value={r.location} />
+            <DetailRow label="Warehouse" value={r.location} />
             <DetailRow label="Validity" value={formatDate(r.validity)} />
             <DetailRow label="Source" value={<SourceBadge source={r.source} />} />
           </dl>

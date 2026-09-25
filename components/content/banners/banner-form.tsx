@@ -58,10 +58,12 @@ function emptyForm(): BannerInput {
     campaignName: "",
     description: "",
     campaignType: "PROMOTIONAL",
-    platforms: [],
-    placements: [],
+    platforms: ["CUSTOMER_APP", "CUSTOMER_WEB"],
+    placements: ["HOME_HERO"],
     desktopImage: undefined,
     mobileImage: undefined,
+    desktopMediaId: undefined,
+    mobileMediaId: undefined,
     headline: "",
     subheadline: "",
     ctaText: "",
@@ -240,16 +242,28 @@ export function BannerForm({ open, mode, banner, onOpenChange, onSave, onPreview
             <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
               <CreativeUpload
                 label="Desktop Banner"
-                hint="Recommended ~16:5"
+                hint="Recommended ~16:5 — shown on Customer WEBAPP"
                 value={values.desktopImage}
-                onChange={(desktopImage) => patch({ desktopImage })}
+                storageKey={values.desktopMediaId}
+                onChange={({ previewUrl, storageKey }) =>
+                  patch({
+                    desktopImage: previewUrl,
+                    desktopMediaId: storageKey,
+                  })
+                }
                 aspectClassName="aspect-[16/5] min-h-[120px]"
               />
               <CreativeUpload
                 label="Mobile Banner"
-                hint="Recommended 4:3 or 9:5"
+                hint="Recommended 4:3 or 9:5 — shown on Customer APP"
                 value={values.mobileImage}
-                onChange={(mobileImage) => patch({ mobileImage })}
+                storageKey={values.mobileMediaId}
+                onChange={({ previewUrl, storageKey }) =>
+                  patch({
+                    mobileImage: previewUrl,
+                    mobileMediaId: storageKey,
+                  })
+                }
                 aspectClassName="aspect-[4/3] min-h-[140px]"
               />
             </div>

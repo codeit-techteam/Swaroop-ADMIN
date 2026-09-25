@@ -26,6 +26,7 @@ const ALL_ROUTES = [
   "/credit-insurance",
   "/receivables",
   "/logistics",
+  "/support",
   "/disputes",
   "/analytics",
   "/content",
@@ -45,6 +46,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/procurement",
     "/orders",
     "/logistics",
+    "/support",
     "/disputes",
     "/master-data",
     "/notifications",
@@ -80,7 +82,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/notifications",
     "/profile",
   ],
-  SUPPORT: ["/dashboard", "/customers", "/users", "/disputes", "/notifications", "/profile"],
+  SUPPORT: ["/dashboard", "/customers", "/users", "/support", "/disputes", "/notifications", "/profile"],
 };
 
 export function canAccessRoute(role: AdminRole, pathname: string) {
@@ -92,11 +94,11 @@ export function permissionLabels(role: AdminRole) {
   const map: Record<AdminRole, string[]> = {
     SUPER_ADMIN: ["Full platform control", "User & role administration", "Grade Master", "Finance overrides", "Content management", "Push notifications"],
     ADMIN: ["Operational control", "Grade Master", "KYC & offers review", "Order management", "Analytics", "Push notifications"],
-    OPERATIONS: ["Orders", "Procurement", "Logistics", "Bulk Logistics Quotes", "Disputes", "Grade Master (view)"],
+    OPERATIONS: ["Orders", "Procurement", "Logistics", "Bulk Logistics Quotes", "Support Tickets", "Disputes", "Grade Master (view)"],
     PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog", "Grade Master"],
     FINANCE: ["Payments", "Receivables", "Credit Management", "Grade Master (view)"],
     COMPLIANCE: ["KYC", "Documents", "Disputes", "Grade Master (view)"],
-    SUPPORT: ["Customers", "Users", "Disputes"],
+    SUPPORT: ["Customers", "Users", "Support Tickets", "Disputes"],
   };
   return map[role];
 }

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ErrorState, TableSkeleton } from "@/components/shared/states";
 import { listCreditApplications } from "@/lib/api/credit";
-import { APPLICATION_STATUSES, displayMoney } from "@/lib/credit-format";
+import { APPLICATION_STATUSES, displayMoney, humanizeCreditStatus } from "@/lib/credit-format";
 import { formatDate } from "@/lib/format";
 
 export default function CreditApplicationsPage() {
@@ -37,7 +37,7 @@ export default function CreditApplicationsPage() {
         }}
         searchPlaceholder="Search application or customer"
         status={status}
-        statuses={APPLICATION_STATUSES.map((item) => ({ value: item, label: item.replaceAll("_", " ") }))}
+        statuses={APPLICATION_STATUSES.map((item) => ({ value: item, label: humanizeCreditStatus(item) }))}
         onStatus={(value) => {
           setPage(1);
           setStatus(value);
@@ -64,7 +64,7 @@ export default function CreditApplicationsPage() {
               { key: "type", header: "Business Type", accessor: (r) => r.customer.businessType ?? "—" },
               { key: "date", header: "Application Date", render: (r) => formatDate(r.createdAt) },
               { key: "limit", header: "Requested Limit", render: (r) => displayMoney(r.requestedLimit) },
-              { key: "status", header: "Current Status", render: (r) => <StatusBadge value={r.status} /> },
+              { key: "status", header: "Current Status", render: (r) => <StatusBadge value={humanizeCreditStatus(r.status)} /> },
               { key: "docs", header: "Documents", accessor: (r) => r.documentCount },
               { key: "admin", header: "Assigned Admin", accessor: (r) => r.assignedAdminName ?? "Unassigned" },
               { key: "updated", header: "Last Updated", render: (r) => formatDate(r.updatedAt) },

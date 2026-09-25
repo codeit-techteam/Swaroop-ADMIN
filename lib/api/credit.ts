@@ -8,6 +8,7 @@ import type {
   CreditListMeta,
   CreditRepayment,
   CreditSummary,
+  CreditTimelineEvent,
   CreditTransaction,
   CustomerCreditSnapshot,
 } from "@/types/credit";
@@ -55,10 +56,23 @@ export async function requestCreditDocuments(id: string, payload: { message?: st
   return data;
 }
 
-export async function approveCreditApplication(
-  id: string,
-  payload: { approvedLimit: number; creditTermDays?: number; reviewAt?: string; reason?: string },
-) {
+export type CreditDecisionPayload = {
+  approvedLimit: number;
+  creditTermDays?: number;
+  reviewAt?: string;
+  reason?: string;
+  customerMessage?: string;
+};
+
+export type CreditInsurancePayload = {
+  insurancePartner?: string;
+  insuranceReference?: string;
+  insuredAmount?: number;
+  customerMessage?: string;
+  notes?: string;
+};
+
+export async function approveCreditApplication(id: string, payload: CreditDecisionPayload) {
   const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/approve`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -66,12 +80,61 @@ export async function approveCreditApplication(
   return data;
 }
 
-export async function rejectCreditApplication(id: string, reason: string) {
-  const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/reject`, {
+export async function partialApproveCreditApplication(id: string, payload: CreditDecisionPayload) {
+  const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/partial-approve`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify(payload),
   });
   return data;
+}
+
+export async function rejectCreditApplication(id: string, reason: string, customerMessage?: string) {
+  const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason, customerMessage }),
+  });
+  return data;
+}
+
+export async function sendCreditInsuranceReview(id: string, payload: CreditInsurancePayload) {
+  const { data } = await apiRequest<CreditApplication>(
+    `/admin/credit/applications/${id}/send-insurance-review`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+  return data;
+}
+
+export async function markCreditArrangementPending(id: string, payload: CreditInsurancePayload) {
+  const { data } = await apiRequest<CreditApplication>(
+    `/admin/credit/applications/${id}/mark-arrangement-pending`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+  return data;
+}
+
+export async function verifyCreditApplicationDocument(
+  id: string,
+  documentId: string,
+  payload: { notes?: string } = {},
+) {
+  const { data } = await apiRequest<CreditDocument>(
+    `/admin/credit/applications/${id}/documents/${documentId}/verify`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+  return data;
+}
+
+export async function rejectCreditApplicationDocument(id: string, documentId: string, reason: string) {
+  const { data } = await apiRequest<CreditDocument>(
+    `/admin/credit/applications/${id}/documents/${documentId}/reject`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+  return data;
+}
+
+export async function getCreditApplicationTimeline(id: string) {
+  const { data } = await apiRequest<CreditTimelineEvent[]>(`/admin/credit/applications/${id}/timeline`);
+  return data ?? [];
 }
 
 export async function listCreditAccounts(params: Record<string, string | number | undefined> = {}) {

@@ -1,10 +1,29 @@
 export type CreditApplicationStatus =
+  | "DRAFT"
   | "PENDING"
+  | "DOCUMENTS_UNDER_REVIEW"
   | "UNDER_REVIEW"
   | "DOCUMENTS_REQUIRED"
+  | "INSURANCE_REVIEW"
+  | "CREDIT_ARRANGEMENT_PENDING"
   | "APPROVED"
+  | "PARTIALLY_APPROVED"
   | "REJECTED"
+  | "EXPIRED"
   | "CANCELLED";
+
+export type CreditInsuranceReviewStatus = "NOT_STARTED" | "IN_REVIEW" | "COMPLETED" | "DECLINED";
+
+export type CreditArrangementStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+
+export type CreditDocumentStatus =
+  | "UPLOADED"
+  | "UNDER_REVIEW"
+  | "VERIFIED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "REPLACED"
+  | "ARCHIVED";
 
 export type CreditAccountStatus = "ACTIVE" | "SUSPENDED" | "BLOCKED" | "EXPIRED" | "CLOSED";
 
@@ -95,9 +114,30 @@ export interface CreditApplication {
   existingExposure: string;
   customer: CreditCustomer;
   creditAccountId: string | null;
+  submittedAt?: string | null;
+  approvedTenureDays?: number | null;
+  customerMessage?: string | null;
+  insuranceStatus?: CreditInsuranceReviewStatus | null;
+  arrangementStatus?: CreditArrangementStatus | null;
+  insurancePartner?: string | null;
+  insuranceReference?: string | null;
+  insuredAmount?: string | null;
+  effectiveAt?: string | null;
+  expiresAt?: string | null;
   documents?: CreditDocument[];
   audit?: CreditAuditEvent[];
+  timeline?: CreditTimelineEvent[];
   storage?: { configured: boolean; pending: boolean };
+}
+
+export interface CreditTimelineEvent {
+  id: string;
+  eventType: string;
+  description: string;
+  actorRole: string | null;
+  customerVisible: boolean;
+  metadata?: unknown;
+  createdAt: string;
 }
 
 export interface CreditAccount {
@@ -195,7 +235,7 @@ export interface CreditDocument {
   documentNumber: string | null;
   fileName: string;
   category: string;
-  status: string;
+  status: CreditDocumentStatus;
   storageKey: string;
   storageProvider: string;
   storageConfigured: boolean;
@@ -204,6 +244,10 @@ export interface CreditDocument {
   ownerId: string;
   organizationId: string | null;
   organizationName: string | null;
+  verificationNotes?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
