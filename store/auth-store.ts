@@ -1,4 +1,4 @@
-    "use client";
+"use client";
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -14,7 +14,7 @@ interface AuthState {
   accessToken: string | null;
   hydrated: boolean;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  demoLogin: (role?: AdminRole) => Promise<void> | void;
+  demoLogin: (role?: AdminRole) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   setHydrated: () => void;
   finishHydration: () => void;
@@ -32,17 +32,6 @@ function clearTokens() {
   window.localStorage.removeItem(AUTH_REFRESH_KEY);
 }
 
-const demoUser = (role: AdminRole = "SUPER_ADMIN"): AdminUser => ({
-  id: "USR-1001",
-  name: role === "SUPER_ADMIN" ? "Admin" : role.replaceAll("_", " "),
-  email: DEMO_CREDENTIALS.email,
-  phone: "+91 98765 00001",
-  role,
-  department: "Platform Control",
-  lastLogin: new Date().toISOString(),
-  permissions: permissionLabels(role),
-});
-
 function mapBackendUser(payload: {
   id: string;
   email?: string | null;
@@ -50,17 +39,22 @@ function mapBackendUser(payload: {
   lastName?: string | null;
   roles?: string[];
 }): AdminUser {
-  const role = (payload.roles?.[0] as AdminRole | undefined) ?? "ADMIN";
+  const roles = payload.roles ?? [];
+  const role: AdminRole = roles.includes("SUPER_ADMIN")
+    ? "SUPER_ADMIN"
+    : roles.includes("ADMIN")
+      ? "ADMIN"
+      : "ADMIN";
   const name = [payload.firstName, payload.lastName].filter(Boolean).join(" ") || "Admin";
   return {
     id: payload.id,
     name,
     email: payload.email ?? DEMO_CREDENTIALS.email,
     phone: "+91 98765 00001",
-    role: role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN",
+    role,
     department: "Platform Control",
     lastLogin: new Date().toISOString(),
-    permissions: permissionLabels(role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN"),
+    permissions: permissionLabels(role),
   };
 }
 
@@ -74,7 +68,11 @@ async function backendLogin(email: string, password: string) {
   if (!response.ok) {
     throw new Error(payload?.message ?? "Invalid corporate email or password.");
   }
-  return payload.data as {
+  const data = payload?.data;
+  if (!data?.accessToken || !data?.user) {
+    throw new Error("Login response missing tokens. Check API base URL.");
+  }
+  return data as {
     accessToken: string;
     refreshToken: string;
     user: {
@@ -101,27 +99,30 @@ export const useAuthStore = create<AuthState>()(
         ) {
           attempts.push([DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password]);
         }
+        let lastError = "Invalid corporate email or password.";
         for (const [tryEmail, tryPassword] of attempts) {
           try {
             const data = await backendLogin(tryEmail, tryPassword);
+            const roles = data.user.roles ?? [];
+            if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
+              lastError = "This account is not an admin. Use admin@test.local.";
+              continue;
+            }
             persistTokens(data.accessToken, data.refreshToken);
             const user = mapBackendUser(data.user);
             setSessionCookie();
             set({ user, accessToken: data.accessToken, hydrated: true });
             return { ok: true };
-          } catch {
-            continue;
+          } catch (error) {
+            lastError =
+              error instanceof Error ? error.message : "Invalid corporate email or password.";
           }
         }
-        return { ok: false, error: "Invalid corporate email or password." };
+        return { ok: false, error: lastError };
       },
       demoLogin: async () => {
         const result = await get().login(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password);
-        if (!result.ok) {
-          const user = demoUser("SUPER_ADMIN");
-          setSessionCookie();
-          set({ user, hydrated: true });
-        }
+        return result;
       },
       logout: () => {
         clearSessionCookie();
@@ -131,9 +132,8 @@ export const useAuthStore = create<AuthState>()(
       setHydrated: () => set({ hydrated: true }),
       finishHydration: () => {
         if (get().hydrated && get().user) return;
-        if (!get().user && hasSessionCookie()) {
-          set({ user: demoUser("SUPER_ADMIN"), hydrated: true });
-          setSessionCookie();
+        if (!get().user && hasSessionCookie() && get().accessToken) {
+          set({ hydrated: true });
           return;
         }
         if (!get().user) clearSessionCookie();
@@ -146,6 +146,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({ user: state.user, accessToken: state.accessToken }),
       onRehydrateStorage: () => (state) => {
         if (state?.accessToken) persistTokens(state.accessToken);
+        if (state?.user && state?.accessToken) setSessionCookie();
       },
     },
   ),

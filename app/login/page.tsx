@@ -48,6 +48,20 @@ export default function LoginPage() {
     router.push("/dashboard");
   });
 
+  const onDemoLogin = async () => {
+    form.clearErrors();
+    form.setValue("email", DEMO_CREDENTIALS.email);
+    form.setValue("password", DEMO_CREDENTIALS.password);
+    const result = await demoLogin("SUPER_ADMIN");
+    if (!result.ok) {
+      form.setError("password", { message: result.error });
+      toast.error(result.error ?? "Demo admin login failed. Backend may still be seeding.");
+      return;
+    }
+    toast.success("Demo Super Admin session started");
+    router.push("/dashboard");
+  };
+
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <section className="relative hidden overflow-hidden bg-navy p-10 text-white lg:flex lg:flex-col">
@@ -114,10 +128,9 @@ export default function LoginPage() {
             <Button
               type="button"
               variant="outline"
+              disabled={form.formState.isSubmitting}
               onClick={() => {
-                demoLogin("SUPER_ADMIN");
-                toast.success("Demo Super Admin session started");
-                router.push("/dashboard");
+                void onDemoLogin();
               }}
             >
               Continue with demo login
