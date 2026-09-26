@@ -1,0 +1,21 @@
+name: swaroop-admin
+region: blr
+services:
+  - name: web
+    github:
+      repo: codeit-techteam/Swaroop-ADMIN
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    envs:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://swaroop-backend-xzwkz.ondigitalocean.app/api/v1
+        scope: RUN_AND_BUILD_TIME
+      - key: NODE_ENV
+        value: production
+        scope: RUN_AND_BUILD_TIME
