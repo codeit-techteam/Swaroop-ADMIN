@@ -18,9 +18,13 @@ export type CtaAction =
   | "OPEN_PRODUCT"
   | "OPEN_OFFER"
   | "OPEN_MARKETPLACE"
+  | "OPEN_PURCHASE_REQUEST"
   | "OPEN_ORDERS"
   | "OPEN_EXTERNAL_URL"
   | "NO_ACTION";
+
+/** IMAGE_OVERLAY = R2 creative photo; NAVY_GRID = structured navy dual-CTA hero. */
+export type BannerLayoutVariant = "IMAGE_OVERLAY" | "NAVY_GRID";
 
 export type BannerPriority = 1 | 2 | 3 | 4 | 5;
 
@@ -76,12 +80,20 @@ export type Banner = {
   mobileImage?: string;
   desktopMediaId?: string;
   mobileMediaId?: string;
+  /** Eyebrow label shown above the headline (e.g. "Blind B2B Marketplace"). */
+  badge?: string;
   headline: string;
   subheadline?: string;
+  /** IMAGE_OVERLAY uses R2 creative; NAVY_GRID is text + dual CTAs on navy grid. */
+  layoutVariant?: BannerLayoutVariant;
   ctaText?: string;
   ctaAction?: CtaAction;
   targetId?: string;
   externalUrl?: string;
+  secondaryCtaText?: string;
+  secondaryCtaAction?: CtaAction;
+  secondaryTargetId?: string;
+  secondaryExternalUrl?: string;
   startDate: string;
   startTime: string;
   endDate: string;

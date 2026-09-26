@@ -30,6 +30,7 @@ import {
   CUSTOMER_AUDIENCES,
   hasCustomerPlatform,
   hasSellerPlatform,
+  LAYOUT_VARIANT_LABELS,
   PLATFORM_LABELS,
   PRIORITY_LABELS,
   relevantPlacements,
@@ -43,6 +44,7 @@ import type {
   Banner,
   BannerAudience,
   BannerInput,
+  BannerLayoutVariant,
   BannerPlacement,
   BannerPlatform,
   BannerPriority,
@@ -64,12 +66,18 @@ function emptyForm(): BannerInput {
     mobileImage: undefined,
     desktopMediaId: undefined,
     mobileMediaId: undefined,
+    badge: "Blind B2B Marketplace",
     headline: "",
     subheadline: "",
-    ctaText: "",
-    ctaAction: "NO_ACTION",
+    layoutVariant: "NAVY_GRID",
+    ctaText: "Browse Marketplace",
+    ctaAction: "OPEN_MARKETPLACE",
     targetId: "",
     externalUrl: "",
+    secondaryCtaText: "Create Purchase Request",
+    secondaryCtaAction: "OPEN_PURCHASE_REQUEST",
+    secondaryTargetId: "",
+    secondaryExternalUrl: "",
     startDate: "",
     startTime: "09:00",
     endDate: "",
@@ -94,12 +102,18 @@ function fromBanner(banner: Banner): BannerInput {
     mobileImage: banner.mobileImage,
     desktopMediaId: banner.desktopMediaId,
     mobileMediaId: banner.mobileMediaId,
+    badge: banner.badge,
     headline: banner.headline,
     subheadline: banner.subheadline,
+    layoutVariant: banner.layoutVariant ?? "IMAGE_OVERLAY",
     ctaText: banner.ctaText,
     ctaAction: banner.ctaAction,
     targetId: banner.targetId,
     externalUrl: banner.externalUrl,
+    secondaryCtaText: banner.secondaryCtaText,
+    secondaryCtaAction: banner.secondaryCtaAction,
+    secondaryTargetId: banner.secondaryTargetId,
+    secondaryExternalUrl: banner.secondaryExternalUrl,
     startDate: banner.startDate,
     startTime: banner.startTime,
     endDate: banner.endDate,
@@ -239,34 +253,63 @@ export function BannerForm({ open, mode, banner, onOpenChange, onSave, onPreview
           </Section>
 
           <Section title="Banner Creative" error={errors.creative}>
-            <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
-              <CreativeUpload
-                label="Desktop Banner"
-                hint="Recommended ~16:5 — shown on Customer WEBAPP"
-                value={values.desktopImage}
-                storageKey={values.desktopMediaId}
-                onChange={({ previewUrl, storageKey }) =>
-                  patch({
-                    desktopImage: previewUrl,
-                    desktopMediaId: storageKey,
-                  })
+            <Field label="Layout" className="sm:col-span-2">
+              <Select
+                value={values.layoutVariant ?? "IMAGE_OVERLAY"}
+                onValueChange={(value) =>
+                  patch({ layoutVariant: value as BannerLayoutVariant })
                 }
-                aspectClassName="aspect-[16/5] min-h-[120px]"
-              />
-              <CreativeUpload
-                label="Mobile Banner"
-                hint="Recommended 4:3 or 9:5 — shown on Customer APP"
-                value={values.mobileImage}
-                storageKey={values.mobileMediaId}
-                onChange={({ previewUrl, storageKey }) =>
-                  patch({
-                    mobileImage: previewUrl,
-                    mobileMediaId: storageKey,
-                  })
-                }
-                aspectClassName="aspect-[4/3] min-h-[140px]"
-              />
-            </div>
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(LAYOUT_VARIANT_LABELS) as BannerLayoutVariant[]).map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {LAYOUT_VARIANT_LABELS[item]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Navy grid heroes need no image — Customer WEBAPP renders the structured dual-CTA banner.
+                Image creatives upload to Cloudflare R2.
+              </p>
+            </Field>
+            {values.layoutVariant !== "NAVY_GRID" ? (
+              <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
+                <CreativeUpload
+                  label="Desktop Banner"
+                  hint="Recommended ~16:5 — shown on Customer WEBAPP"
+                  value={values.desktopImage}
+                  storageKey={values.desktopMediaId}
+                  onChange={({ previewUrl, storageKey }) =>
+                    patch({
+                      desktopImage: previewUrl,
+                      desktopMediaId: storageKey,
+                    })
+                  }
+                  aspectClassName="aspect-[16/5] min-h-[120px]"
+                />
+                <CreativeUpload
+                  label="Mobile Banner"
+                  hint="Recommended 4:3 or 9:5 — shown on Customer APP"
+                  value={values.mobileImage}
+                  storageKey={values.mobileMediaId}
+                  onChange={({ previewUrl, storageKey }) =>
+                    patch({
+                      mobileImage: previewUrl,
+                      mobileMediaId: storageKey,
+                    })
+                  }
+                  aspectClassName="aspect-[4/3] min-h-[140px]"
+                />
+              </div>
+            ) : (
+              <p className="sm:col-span-2 text-sm text-muted-foreground">
+                Optional: switch to Image creative if you later want an R2 photo overlay instead of the navy grid.
+              </p>
+            )}
           </Section>
 
           <Section title="Platform Targeting" error={errors.platforms}>
@@ -323,28 +366,35 @@ export function BannerForm({ open, mode, banner, onOpenChange, onSave, onPreview
           </Section>
 
           <Section title="Banner Content">
+            <Field label="Eyebrow / Badge" className="sm:col-span-2">
+              <Input
+                value={values.badge ?? ""}
+                onChange={(e) => patch({ badge: e.target.value })}
+                placeholder="Blind B2B Marketplace"
+              />
+            </Field>
             <Field label="Headline" error={errors.headline} className="sm:col-span-2">
               <Input
                 value={values.headline}
                 onChange={(e) => patch({ headline: e.target.value })}
-                placeholder="Special Bulk Fuel Pricing"
+                placeholder="Source Petrochemicals with Confidence"
               />
             </Field>
             <Field label="Subheadline" className="sm:col-span-2">
               <Input
                 value={values.subheadline ?? ""}
                 onChange={(e) => patch({ subheadline: e.target.value })}
-                placeholder="Get better rates on bulk orders."
+                placeholder="Discover verified grades, compare market prices…"
               />
             </Field>
-            <Field label="CTA Text">
+            <Field label="Primary CTA Text">
               <Input
                 value={values.ctaText ?? ""}
                 onChange={(e) => patch({ ctaText: e.target.value })}
-                placeholder="Explore Offers"
+                placeholder="Browse Marketplace"
               />
             </Field>
-            <Field label="CTA Action">
+            <Field label="Primary CTA Action">
               <Select
                 value={values.ctaAction ?? "NO_ACTION"}
                 onValueChange={(value) =>
@@ -403,6 +453,50 @@ export function BannerForm({ open, mode, banner, onOpenChange, onSave, onPreview
                   placeholder="https://"
                 />
               </Field>
+            ) : null}
+
+            {values.layoutVariant === "NAVY_GRID" ? (
+              <>
+                <Field label="Secondary CTA Text">
+                  <Input
+                    value={values.secondaryCtaText ?? ""}
+                    onChange={(e) => patch({ secondaryCtaText: e.target.value })}
+                    placeholder="Create Purchase Request"
+                  />
+                </Field>
+                <Field label="Secondary CTA Action">
+                  <Select
+                    value={values.secondaryCtaAction ?? "NO_ACTION"}
+                    onValueChange={(value) =>
+                      patch({
+                        secondaryCtaAction: value as CtaAction,
+                        secondaryTargetId: "",
+                        secondaryExternalUrl: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(CTA_LABELS) as CtaAction[]).map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {CTA_LABELS[item]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {values.secondaryCtaAction === "OPEN_EXTERNAL_URL" ? (
+                  <Field label="Secondary External URL" className="sm:col-span-2">
+                    <Input
+                      value={values.secondaryExternalUrl ?? ""}
+                      onChange={(e) => patch({ secondaryExternalUrl: e.target.value })}
+                      placeholder="https://"
+                    />
+                  </Field>
+                ) : null}
+              </>
             ) : null}
           </Section>
 

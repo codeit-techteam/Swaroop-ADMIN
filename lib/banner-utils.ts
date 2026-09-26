@@ -5,6 +5,7 @@ import type {
   BannerFilters,
   BannerInput,
   BannerKpis,
+  BannerLayoutVariant,
   BannerPlacement,
   BannerPlatform,
   BannerPriority,
@@ -47,9 +48,15 @@ export const CTA_LABELS: Record<CtaAction, string> = {
   OPEN_PRODUCT: "Open Product",
   OPEN_OFFER: "Open Offer",
   OPEN_MARKETPLACE: "Open Marketplace",
+  OPEN_PURCHASE_REQUEST: "Create Purchase Request",
   OPEN_ORDERS: "Open Orders",
   OPEN_EXTERNAL_URL: "Open External URL",
   NO_ACTION: "No Action",
+};
+
+export const LAYOUT_VARIANT_LABELS: Record<BannerLayoutVariant, string> = {
+  IMAGE_OVERLAY: "Image creative (R2 upload)",
+  NAVY_GRID: "Navy grid hero (text + dual CTAs)",
 };
 
 export const PRIORITY_LABELS: Record<BannerPriority, string> = {
@@ -342,12 +349,19 @@ export function validateBannerForm(
     | "ctaAction"
     | "targetId"
     | "externalUrl"
+    | "layoutVariant"
+    | "secondaryCtaAction"
+    | "secondaryTargetId"
+    | "secondaryExternalUrl"
   >,
   action: "draft" | "schedule" | "activate",
 ): BannerFormErrors {
   const errors: BannerFormErrors = {};
   if (!values.name.trim()) errors.name = "Banner name is required.";
-  if (!values.desktopImage && !values.mobileImage) errors.creative = "Upload a desktop or mobile creative.";
+  const isNavyGrid = values.layoutVariant === "NAVY_GRID";
+  if (!isNavyGrid && !values.desktopImage && !values.mobileImage) {
+    errors.creative = "Upload a desktop or mobile creative, or switch to Navy grid hero.";
+  }
   const creative = values.desktopImage || values.mobileImage;
   if (creative && (creative.startsWith("data:") || creative.startsWith("blob:"))) {
     errors.creative = "Upload the file or paste a public HTTPS image URL before saving.";
@@ -369,11 +383,27 @@ export function validateBannerForm(
   if (values.ctaAction === "OPEN_EXTERNAL_URL" && !values.externalUrl?.trim()) {
     errors.externalUrl = "Enter an external URL.";
   }
+  if (values.secondaryCtaAction === "OPEN_PRODUCT" && !values.secondaryTargetId) {
+    errors.targetId = "Select a product for the secondary CTA.";
+  }
+  if (values.secondaryCtaAction === "OPEN_OFFER" && !values.secondaryTargetId) {
+    errors.targetId = "Select an offer for the secondary CTA.";
+  }
+  if (values.secondaryCtaAction === "OPEN_EXTERNAL_URL" && !values.secondaryExternalUrl?.trim()) {
+    errors.externalUrl = "Enter an external URL for the secondary CTA.";
+  }
   if (values.externalUrl?.trim()) {
     try {
       new URL(values.externalUrl);
     } catch {
       errors.externalUrl = "Enter a valid URL including https://";
+    }
+  }
+  if (values.secondaryExternalUrl?.trim()) {
+    try {
+      new URL(values.secondaryExternalUrl);
+    } catch {
+      errors.externalUrl = "Enter a valid secondary URL including https://";
     }
   }
   if (action === "schedule" && values.startDate) {

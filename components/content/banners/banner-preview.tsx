@@ -37,6 +37,7 @@ export function BannerPreview({ open, onOpenChange, banner }: BannerPreviewProps
   const isCustomer = activePlatform === "CUSTOMER_APP" || activePlatform === "CUSTOMER_WEB";
   const nav = isCustomer ? ["Home", "Marketplace", "Orders"] : ["Dashboard", "Offers", "Dispatch"];
   const isApp = activePlatform === "CUSTOMER_APP" || activePlatform === "SELLER_APP";
+  const isNavyGrid = banner.layoutVariant === "NAVY_GRID" || (!image && banner.layoutVariant !== "IMAGE_OVERLAY");
 
   return (
     <Dialog
@@ -98,30 +99,87 @@ export function BannerPreview({ open, onOpenChange, banner }: BannerPreviewProps
                 {PLATFORM_LABELS[activePlatform]}
               </span>
             </div>
-            <div className="bg-slate-50">
-              {image ? (
+            <div className="bg-slate-50 p-3">
+              {isNavyGrid ? (
+                <div
+                  className={cn(
+                    "relative overflow-hidden rounded-xl",
+                    device === "mobile" ? "min-h-[160px]" : "min-h-[180px]",
+                  )}
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 12% 20%, rgba(30,111,255,0.45), transparent 42%), linear-gradient(135deg, #0B2E59 0%, #123A6B 45%, #0F2A4A 100%)",
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 opacity-[0.08]"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px)",
+                      backgroundSize: "28px 28px",
+                    }}
+                  />
+                  <div
+                    className={cn(
+                      "relative flex flex-col gap-3 p-4",
+                      device === "desktop" && "sm:flex-row sm:items-end sm:justify-between",
+                    )}
+                  >
+                    <div className="max-w-md">
+                      {banner.badge ? (
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
+                          {banner.badge}
+                        </p>
+                      ) : null}
+                      <p className="text-base font-bold text-white">{banner.headline}</p>
+                      {banner.subheadline ? (
+                        <p className="mt-1 text-xs leading-relaxed text-white/85">{banner.subheadline}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {banner.ctaText && banner.ctaAction !== "NO_ACTION" ? (
+                        <Button type="button" size="sm" className="bg-white text-[#0B2E59] hover:bg-slate-100">
+                          {banner.ctaText} →
+                        </Button>
+                      ) : null}
+                      {banner.secondaryCtaText && banner.secondaryCtaAction !== "NO_ACTION" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        >
+                          {banner.secondaryCtaText}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={image}
                   alt={banner.headline}
-                  className={cn("w-full object-cover", device === "mobile" ? "h-40" : "h-36")}
+                  className={cn("w-full rounded-md object-cover", device === "mobile" ? "h-40" : "h-36")}
                 />
               ) : (
-                <div className={cn("flex items-center justify-center bg-slate-200 text-sm", device === "mobile" ? "h-40" : "h-36")}>
+                <div className={cn("flex items-center justify-center rounded-md bg-slate-200 text-sm", device === "mobile" ? "h-40" : "h-36")}>
                   No creative
                 </div>
               )}
-              <div className="px-3 py-3">
-                <p className="text-sm font-semibold">{banner.headline}</p>
-                {banner.subheadline ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{banner.subheadline}</p>
-                ) : null}
-                {banner.ctaText && banner.ctaAction !== "NO_ACTION" ? (
-                  <Button type="button" size="sm" className="mt-3">
-                    {banner.ctaText}
-                  </Button>
-                ) : null}
-              </div>
+              {!isNavyGrid ? (
+                <div className="px-1 pt-3">
+                  <p className="text-sm font-semibold">{banner.headline}</p>
+                  {banner.subheadline ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{banner.subheadline}</p>
+                  ) : null}
+                  {banner.ctaText && banner.ctaAction !== "NO_ACTION" ? (
+                    <Button type="button" size="sm" className="mt-3">
+                      {banner.ctaText}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div className="grid grid-cols-3 border-t text-center text-[11px] text-muted-foreground">
               {nav.map((item) => (

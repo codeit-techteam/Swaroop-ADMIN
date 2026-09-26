@@ -71,10 +71,22 @@ export function BannerDetails({ banner, open, onOpenChange, onEdit, onPreview }:
           }
         />
         <DetailRow label="Placements" value={banner.placements.map(placementLabel).join(", ")} />
+        <DetailRow
+          label="Layout"
+          value={banner.layoutVariant === "NAVY_GRID" ? "Navy grid hero" : "Image creative"}
+        />
+        <DetailRow label="Eyebrow" value={banner.badge || "—"} />
         <DetailRow label="Headline" value={banner.headline} />
         <DetailRow label="Subheadline" value={banner.subheadline || "—"} />
-        <DetailRow label="CTA" value={banner.ctaText || "—"} />
-        <DetailRow label="CTA Action" value={banner.ctaAction ? CTA_LABELS[banner.ctaAction] : "—"} />
+        <DetailRow label="Primary CTA" value={banner.ctaText || "—"} />
+        <DetailRow label="Primary Action" value={banner.ctaAction ? CTA_LABELS[banner.ctaAction] : "—"} />
+        <DetailRow label="Secondary CTA" value={banner.secondaryCtaText || "—"} />
+        <DetailRow
+          label="Secondary Action"
+          value={
+            banner.secondaryCtaAction ? CTA_LABELS[banner.secondaryCtaAction] : "—"
+          }
+        />
         <DetailRow
           label="Schedule"
           value={`${formatDate(banner.startDate)} ${banner.startTime} – ${formatDate(banner.endDate)} ${banner.endTime}`}

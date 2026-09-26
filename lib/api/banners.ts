@@ -19,6 +19,7 @@ import type {
   BannerStatus,
   CampaignType,
   CtaAction,
+  BannerLayoutVariant,
 } from "@/types/banner";
 
 type CmsBanner = {
@@ -227,12 +228,28 @@ function mapBanner(row: CmsBanner): Banner {
     mobileImage: mobilePreview ?? preview,
     desktopMediaId: storageKey,
     mobileMediaId: mobileStorage,
+    badge: typeof meta.badge === "string" ? meta.badge : undefined,
     headline: row.title,
     subheadline: row.subtitle ?? undefined,
+    layoutVariant:
+      meta.layoutVariant === "NAVY_GRID" || meta.layoutVariant === "IMAGE_OVERLAY"
+        ? (meta.layoutVariant as BannerLayoutVariant)
+        : preview
+          ? "IMAGE_OVERLAY"
+          : "NAVY_GRID",
     ctaText: String(meta.ctaText ?? "View"),
     ctaAction: (meta.ctaAction as CtaAction) || "NO_ACTION",
     targetId: String(meta.targetId ?? row.targetRoute ?? ""),
     externalUrl: typeof meta.externalUrl === "string" ? meta.externalUrl : undefined,
+    secondaryCtaText:
+      typeof meta.secondaryCtaText === "string" ? meta.secondaryCtaText : undefined,
+    secondaryCtaAction: (meta.secondaryCtaAction as CtaAction) || undefined,
+    secondaryTargetId:
+      typeof meta.secondaryTargetId === "string" ? meta.secondaryTargetId : undefined,
+    secondaryExternalUrl:
+      typeof meta.secondaryExternalUrl === "string"
+        ? meta.secondaryExternalUrl
+        : undefined,
     startDate: start.date,
     startTime: start.time,
     endDate: end.date,
@@ -280,6 +297,8 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
       platforms,
       platform,
       placement,
+      badge: input.badge,
+      layoutVariant: input.layoutVariant ?? (desktop || mobile ? "IMAGE_OVERLAY" : "NAVY_GRID"),
       ctaText: input.ctaText,
       ctaAction: input.ctaAction,
       targetId: input.targetId,
@@ -287,6 +306,10 @@ function toCmsPayload(input: BannerInput | Partial<Banner>, actor?: string) {
       createdBy: actor,
       mobileImage: mobile ?? desktop,
       externalUrl: input.externalUrl,
+      secondaryCtaText: input.secondaryCtaText,
+      secondaryCtaAction: input.secondaryCtaAction,
+      secondaryTargetId: input.secondaryTargetId,
+      secondaryExternalUrl: input.secondaryExternalUrl,
     },
   };
 }
@@ -363,12 +386,18 @@ export async function duplicateBanner(id: string, actor = "Admin"): Promise<Bann
     mobileImage: source.mobileImage,
     desktopMediaId: source.desktopMediaId,
     mobileMediaId: source.mobileMediaId,
+    badge: source.badge,
     headline: source.headline,
     subheadline: source.subheadline,
+    layoutVariant: source.layoutVariant,
     ctaText: source.ctaText,
     ctaAction: source.ctaAction,
     targetId: source.targetId,
     externalUrl: source.externalUrl,
+    secondaryCtaText: source.secondaryCtaText,
+    secondaryCtaAction: source.secondaryCtaAction,
+    secondaryTargetId: source.secondaryTargetId,
+    secondaryExternalUrl: source.secondaryExternalUrl,
     startDate: source.startDate,
     startTime: source.startTime,
     endDate: source.endDate,
