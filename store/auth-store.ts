@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { DEMO_CREDENTIALS } from "@/lib/constants";
 import { API_BASE_URL, AUTH_REFRESH_KEY, AUTH_TOKEN_KEY } from "@/lib/env";
 import { permissionLabels } from "@/lib/permissions";
 import { clearSessionCookie, hasSessionCookie, setSessionCookie } from "@/lib/session";
@@ -14,7 +13,6 @@ interface AuthState {
   accessToken: string | null;
   hydrated: boolean;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  demoLogin: (role?: AdminRole) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   setHydrated: () => void;
   finishHydration: () => void;
@@ -49,7 +47,7 @@ function mapBackendUser(payload: {
   return {
     id: payload.id,
     name,
-    email: payload.email ?? DEMO_CREDENTIALS.email,
+    email: payload.email ?? "",
     phone: "+91 98765 00001",
     role,
     department: "Platform Control",
@@ -92,37 +90,29 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       hydrated: false,
       login: async (email, password) => {
-        const attempts: Array<[string, string]> = [[email.trim().toLowerCase(), password]];
-        if (
-          email.toLowerCase() === "admin@petrotrade.com" &&
-          (password === "Admin@123" || password === DEMO_CREDENTIALS.password)
-        ) {
-          attempts.push([DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password]);
-        }
-        let lastError = "Invalid corporate email or password.";
-        for (const [tryEmail, tryPassword] of attempts) {
-          try {
-            const data = await backendLogin(tryEmail, tryPassword);
-            const roles = data.user.roles ?? [];
-            if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
-              lastError = "This account is not an admin. Use admin@test.local.";
-              continue;
-            }
-            persistTokens(data.accessToken, data.refreshToken);
-            const user = mapBackendUser(data.user);
-            setSessionCookie();
-            set({ user, accessToken: data.accessToken, hydrated: true });
-            return { ok: true };
-          } catch (error) {
-            lastError =
-              error instanceof Error ? error.message : "Invalid corporate email or password.";
+        try {
+          const data = await backendLogin(email.trim().toLowerCase(), password);
+          const roles = data.user.roles ?? [];
+          if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
+            return { ok: false, error: "This account does not have admin access." };
           }
+          persistTokens(data.accessToken, data.refreshToken);
+          const user = mapBackendUser(data.user);
+          setSessionCookie();
+          set({ user, accessToken: data.accessToken, hydrated: true });
+          return { ok: true };
+        } catch (error) {
+          if (error instanceof TypeError) {
+            return {
+              ok: false,
+              error: "Unable to reach the server. Check your connection and try again.",
+            };
+          }
+          return {
+            ok: false,
+            error: error instanceof Error ? error.message : "Invalid corporate email or password.",
+          };
         }
-        return { ok: false, error: lastError };
-      },
-      demoLogin: async () => {
-        const result = await get().login(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password);
-        return result;
       },
       logout: () => {
         clearSessionCookie();
