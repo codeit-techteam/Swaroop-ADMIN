@@ -20,6 +20,25 @@ export function formatInrExact(amount: number) {
   }).format(amount);
 }
 
+/** Format a backend decimal string without binary floating-point arithmetic. */
+export function formatInrDecimal(value: string | number | null | undefined) {
+  if (value == null || value === "") return "—";
+  const raw = String(value).trim();
+  if (!/^-?\d+(\.\d+)?$/.test(raw)) return "—";
+  const negative = raw.startsWith("-");
+  const parts = raw.replace("-", "").split(".");
+  const whole = (parts[0] ?? "0").replace(/^0+(?=\d)/, "") || "0";
+  const fraction = parts[1] ?? "00";
+  return `${negative ? "-" : ""}₹${groupIndian(whole)}.${fraction.padEnd(2, "0").slice(0, 2)}`;
+}
+
+function groupIndian(whole: string) {
+  if (whole.length <= 3) return whole;
+  const head = whole.slice(0, -3);
+  const tail = whole.slice(-3);
+  return `${head.replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${tail}`;
+}
+
 export function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
 }

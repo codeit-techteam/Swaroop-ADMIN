@@ -1,7 +1,12 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  AdminKycDetail,
+  AdminSellerReview,
+  AppSource,
   Customer,
+  KycChangeRequest,
   KycRecord,
+  KycStatus,
   Offer,
   Order,
   Payment,
@@ -48,7 +53,7 @@ export function mapAdminCustomer(row: Record<string, unknown>): Customer {
     email: String(user.email ?? ""),
     phone: String(user.phone ?? ""),
     location: "India",
-    kycStatus: String(org.verificationStatus ?? "Pending") === "VERIFIED" ? "Approved" : "Pending",
+    kycStatus: mapKycStatus(String(org.verificationStatus ?? "")),
     creditLimit: num(credit.approvedLimit),
     usedCredit: num(credit.utilizedAmount ?? credit.outstandingAmount),
     orders: num(count.orders ?? count.purchaseRequests),
@@ -73,7 +78,7 @@ export function mapAdminSeller(row: Record<string, unknown>): Seller {
     email: String(user.email ?? ""),
     phone: String(user.phone ?? ""),
     location: "India",
-    kycStatus: String(org.verificationStatus ?? "Pending") === "VERIFIED" ? "Approved" : "Pending",
+    kycStatus: mapKycStatus(String(org.verificationStatus ?? "")),
     products: num(count.products),
     offers: num(count.offers),
     orders: num(count.orders),
@@ -297,33 +302,163 @@ function mapKycStatus(status?: string): KycRecord["status"] {
   }
 }
 
-export function mapAdminKyc(
-  row: Record<string, unknown>,
-  entityType: KycRecord["entityType"],
-): KycRecord {
-  const org = (row.organization ?? {}) as Record<string, unknown>;
-  const user = (row.user ?? {}) as Record<string, unknown>;
-  const verification = (row.verification ?? {}) as Record<string, unknown>;
-  const counts = Array.isArray(row.documentCounts)
-    ? (row.documentCounts as Array<{ count?: number }>)
-    : [];
-  const docs = counts.reduce((sum, item) => sum + num(item.count), 0);
+const ADMIN_KYC_STATUS: Record<string, KycStatus> = {
+  PENDING: "Pending",
+  UNDER_REVIEW: "Under Review",
+  CHANGES_REQUESTED: "Changes Requested",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+function mapUploadSource(value: unknown): AppSource | null {
+  switch (value) {
+    case "SELLER_APP":
+      return "Seller App";
+    case "SELLER_WEB":
+      return "Seller Web";
+    case "CUSTOMER_APP":
+      return "Customer App";
+    case "CUSTOMER_WEB":
+      return "Customer Web";
+    default:
+      return null;
+  }
+}
+
+function mapChangeRequest(value: unknown): KycChangeRequest | null {
+  const raw = asRecord(value);
+  if (typeof raw.reason !== "string") return null;
   return {
-    id: String(row.id ?? row.sellerProfileId ?? org.id ?? ""),
-    entity: String(org.legalName ?? org.name ?? user.displayName ?? entityType),
+    reason: raw.reason,
+    slots: Array.isArray(raw.slots) ? raw.slots.map(String) : [],
+    documentIds: Array.isArray(raw.documentIds) ? raw.documentIds.map(String) : [],
+    requestedAt: iso(raw.requestedAt),
+  };
+}
+
+/** Row from GET /admin/kyc (seller onboarding + customer KYC queue). */
+export function mapAdminKycRow(row: Record<string, unknown>): KycRecord {
+  const org = asRecord(row.organization);
+  const contact = asRecord(row.contact);
+  const docs = asRecord(row.documents);
+  const bank = asRecord(row.bank);
+  const entityType = row.entityType === "CUSTOMER" ? "Customer" : "Seller";
+  const kycStatus = ADMIN_KYC_STATUS[String(row.kycStatus ?? "")] ?? "Pending";
+  const missing = Array.isArray(docs.missing) ? docs.missing.map(String) : [];
+  const bankLabel = bank.accountLast4
+    ? [optionalString(bank.bankName), `A/c •••• ${String(bank.accountLast4)}`, optionalString(bank.ifsc)]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+  return {
+    id: String(row.id),
+    entityId: String(row.entityId),
+    entity: String(org.legalName || org.name || entityType),
     entityType,
     type: "Company",
-    submitted: iso(row.createdAt ?? verification.submittedAt ?? row.updatedAt),
-    documents: docs,
-    risk: String(org.verificationStatus ?? "") === "REJECTED" ? "High" : "Medium",
-    status: mapKycStatus(String(verification.status ?? org.verificationStatus ?? "")),
-    reviewer: "Admin",
+    submitted: iso(row.submittedAt ?? row.lastActivityAt ?? row.createdAt),
+    documents: num(docs.uploaded),
+    documentsPending: num(docs.pending),
+    documentsRejected: num(docs.rejected),
+    documentsMissing: missing,
+    risk:
+      kycStatus === "Rejected"
+        ? "High"
+        : missing.length || num(docs.rejected)
+          ? "Medium"
+          : "Low",
+    status: kycStatus,
+    reviewer: row.reviewedAt ? "Compliance" : "—",
+    reviewedAt: optionalString(row.reviewedAt),
     gst: String(org.gstin ?? ""),
     pan: String(org.pan ?? ""),
-    bank: "",
-    notes: String(verification.notes ?? row.notes ?? ""),
-    source: entityType === "Seller" ? "Seller Web" : "Customer Web",
+    bank: bankLabel,
+    notes: String(row.reviewNotes ?? ""),
+    rejectedReason: optionalString(row.rejectedReason),
+    changeRequest: mapChangeRequest(row.changeRequest),
+    contact: String(contact.name ?? ""),
+    phone: String(contact.phone ?? ""),
+    email: String(contact.email ?? ""),
+    entityStatus: String(row.entityStatus ?? ""),
+    source:
+      mapUploadSource(row.source) ??
+      (entityType === "Seller" ? "Seller Web" : "Customer Web"),
   };
+}
+
+function kycPath(record: Pick<KycRecord, "entityType" | "entityId">) {
+  const type = record.entityType === "Customer" ? "customer" : "seller";
+  return `/admin/kyc/${type}/${record.entityId}`;
+}
+
+export async function getAdminKycDetail(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+): Promise<AdminKycDetail> {
+  const { data } = await apiRequest<Record<string, unknown>>(kycPath(record));
+  const details = asRecord(data.details);
+  const slots = Array.isArray(data.slots) ? (data.slots as Record<string, unknown>[]) : [];
+  return {
+    record: mapAdminKycRow(data),
+    blockers: Array.isArray(data.blockers) ? data.blockers.map(String) : [],
+    legalName: optionalString(details.legalName),
+    address: optionalString(details.address),
+    slots: slots.map((slot) => {
+      const doc = asRecord(slot.document);
+      const size = Number(doc.fileSizeBytes);
+      return {
+        slot: String(slot.slot),
+        name: String(slot.name ?? slot.slot),
+        description: String(slot.description ?? ""),
+        required: Boolean(slot.required),
+        document: doc.id
+          ? {
+              id: String(doc.id),
+              slot: optionalString(doc.slot),
+              slotLabel: String(doc.slotLabel ?? slot.name ?? "Document"),
+              fileName: String(doc.fileName ?? "Document"),
+              mimeType: optionalString(doc.mimeType),
+              fileSizeBytes: Number.isFinite(size) && size > 0 ? size : null,
+              status: mapDocumentStatus(String(doc.status ?? "")),
+              rejectionReason: optionalString(doc.rejectionReason),
+              source: mapUploadSource(doc.uploadSource),
+              uploadedAt: iso(doc.uploadedAt),
+              reviewedAt: optionalString(doc.reviewedAt),
+            }
+          : null,
+      };
+    }),
+  };
+}
+
+export async function approveAdminKyc(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+  notes?: string,
+) {
+  await apiRequest(`${kycPath(record)}/approve`, {
+    method: "POST",
+    body: JSON.stringify(notes?.trim() ? { notes: notes.trim() } : {}),
+  });
+}
+
+export async function rejectAdminKyc(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+  reason: string,
+) {
+  await apiRequest(`${kycPath(record)}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function requestAdminKycChanges(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+  reason: string,
+  documentIds: string[],
+) {
+  await apiRequest(`${kycPath(record)}/request-changes`, {
+    method: "POST",
+    body: JSON.stringify({ reason, documentIds }),
+  });
 }
 
 function mapDocumentCategory(category?: string): PlatformDocument["category"] {
@@ -363,42 +498,142 @@ const ONBOARDING_SLOT_LABELS: Record<string, string> = {
   cancelledCheque: "Cancelled Cheque",
 };
 
+export function onboardingSlotLabel(slot?: string | null) {
+  return slot ? ONBOARDING_SLOT_LABELS[slot] : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function mapDocumentSource(
+  ownerType: string,
+  purpose: string,
+  uploadSource: string,
+): PlatformDocument["source"] {
+  if (uploadSource === "SELLER_APP") return "Seller App";
+  if (uploadSource === "SELLER_WEB") return "Seller Web";
+  if (uploadSource === "CUSTOMER_APP") return "Customer App";
+  if (uploadSource === "CUSTOMER_WEB") return "Customer Web";
+  if (ownerType === "SELLER" || purpose.startsWith("SELLER_")) return "Seller Web";
+  if (ownerType === "CUSTOMER") return "Customer Web";
+  return "Admin Portal";
+}
+
 export function mapAdminDocument(row: Record<string, unknown>): PlatformDocument {
-  const org = (row.organization ?? {}) as Record<string, unknown>;
-  const meta =
-    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
-      ? (row.metadata as Record<string, unknown>)
-      : {};
-  const slot = typeof meta.slot === "string" ? meta.slot : "";
-  const purpose = typeof meta.purpose === "string" ? meta.purpose : "";
-  const slotLabel = slot ? ONBOARDING_SLOT_LABELS[slot] : undefined;
+  const org = asRecord(row.organization);
+  const meta = asRecord(row.metadata);
+  const uploader = asRecord(row.uploadedBy);
+  const seller = asRecord(row.seller);
+  const slot = optionalString(row.slot) ?? optionalString(meta.slot);
+  const purpose = optionalString(row.purpose) ?? optionalString(meta.purpose) ?? "";
+  const uploadSource =
+    optionalString(row.uploadSource) ?? optionalString(meta.uploadSource) ?? "";
+  const slotLabel = optionalString(row.slotLabel) ?? onboardingSlotLabel(slot);
   const fileName = String(
     row.originalFileName ?? row.fileName ?? row.documentNumber ?? "Document",
   );
   const ownerType = String(row.ownerType ?? "").toUpperCase();
-  const source: PlatformDocument["source"] =
-    purpose === "SELLER_ONBOARDING" ||
-    purpose === "SELLER_PANEL" ||
-    ownerType === "SELLER"
-      ? "Seller Web"
-      : ownerType === "CUSTOMER"
-        ? "Customer Web"
-        : "Admin Portal";
+  const size = Number(row.fileSizeBytes);
+  const uploaderName =
+    [uploader.firstName, uploader.lastName].filter(Boolean).join(" ") ||
+    String(uploader.email ?? uploader.phone ?? "");
 
   return {
     id: String(row.id),
     name: slotLabel ? `${slotLabel} (${fileName})` : fileName,
     category: mapDocumentCategory(String(row.category ?? "")),
-    entity: String(org.legalName ?? org.name ?? "Organization"),
+    entity: String(org.legalName || org.name || "Organization"),
     uploadedAt: iso(row.uploadedAt ?? row.createdAt),
     status: mapDocumentStatus(String(row.status ?? "")),
-    source,
+    source: mapDocumentSource(ownerType, purpose, uploadSource),
+    fileName,
+    documentNumber: optionalString(row.documentNumber),
+    mimeType: optionalString(row.mimeType),
+    fileSizeBytes: Number.isFinite(size) && size > 0 ? size : null,
+    slot,
+    isOnboarding: purpose === "SELLER_ONBOARDING" || purpose === "CUSTOMER_KYC",
+    rejectionReason: optionalString(row.rejectionReason),
+    verificationNotes: optionalString(row.verificationNotes),
+    reviewedAt: optionalString(row.approvedAt) ?? optionalString(row.rejectedAt),
+    uploadedBy: uploader.id
+      ? {
+          name: uploaderName,
+          email: String(uploader.email ?? ""),
+          phone: String(uploader.phone ?? ""),
+        }
+      : null,
+    seller: seller.id
+      ? {
+          id: String(seller.id),
+          status: String(seller.status ?? ""),
+          onboardingStatus: optionalString(seller.onboardingStatus),
+          onboardingSubmittedAt: optionalString(seller.onboardingSubmittedAt),
+        }
+      : null,
+    organization: org.id
+      ? { gstin: String(org.gstin ?? ""), pan: String(org.pan ?? "") }
+      : null,
   };
 }
 
 export async function listAdminDocuments() {
   const rows = await listAll<Record<string, unknown>>("/admin/documents");
   return rows.map(mapAdminDocument);
+}
+
+export async function getAdminSellerReview(id: string): Promise<AdminSellerReview> {
+  const { data } = await apiRequest<Record<string, unknown>>(`/admin/sellers/${id}`);
+  const org = asRecord(data.organization);
+  const user = asRecord(data.user);
+  const onboarding = asRecord(data.onboarding);
+  const docs = Array.isArray(data.onboardingDocuments)
+    ? (data.onboardingDocuments as Record<string, unknown>[])
+    : [];
+  return {
+    id: String(data.id),
+    company: String(org.legalName || org.name || "Seller"),
+    status: String(data.status ?? ""),
+    onboardingStatus: optionalString(onboarding.status),
+    submittedAt: optionalString(onboarding.submittedAt),
+    gstin: String(org.gstin ?? ""),
+    pan: String(org.pan ?? ""),
+    contact:
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      String(user.displayName ?? ""),
+    email: String(user.email ?? ""),
+    phone: String(user.phone ?? ""),
+    documents: docs.map((doc) => ({
+      id: String(doc.id),
+      slot: optionalString(doc.slot),
+      category: String(doc.category ?? ""),
+      fileName: String(doc.originalFileName ?? doc.fileName ?? "Document"),
+      mimeType: optionalString(doc.mimeType),
+      status: mapDocumentStatus(String(doc.status ?? "")),
+      rejectionReason: optionalString(doc.rejectionReason),
+      uploadedAt: iso(doc.createdAt),
+    })),
+  };
+}
+
+export async function approveAdminSeller(id: string, notes?: string) {
+  await apiRequest(`/admin/sellers/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ notes: notes?.trim() || "Approved after document review" }),
+  });
+}
+
+export async function rejectAdminSeller(id: string, reason: string) {
+  await apiRequest(`/admin/sellers/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function approveAdminDocument(id: string, notes?: string) {
@@ -415,12 +650,16 @@ export async function rejectAdminDocument(id: string, reason: string) {
   });
 }
 
-export async function downloadAdminDocument(id: string) {
+export async function downloadAdminDocument(
+  id: string,
+  disposition: "inline" | "attachment" = "attachment",
+) {
   const { data } = await apiRequest<{
     url: string;
     fileName?: string;
-    mimeType?: string;
-  }>(`/admin/documents/${id}/download`);
+    mimeType?: string | null;
+    expiresAt?: string;
+  }>(`/admin/documents/${id}/download?disposition=${disposition}`);
   return data;
 }
 
@@ -478,28 +717,8 @@ export function mapAdminProcurement(row: Record<string, unknown>): Procurement {
 }
 
 export async function listAdminKyc() {
-  const [sellers, customers] = await Promise.all([
-    listAll<Record<string, unknown>>("/admin/compliance"),
-    listAdminCustomers(),
-  ]);
-  const sellerKyc = sellers.map((row) => mapAdminKyc(row, "Seller"));
-  const customerKyc = customers.map((customer) => ({
-    id: `kyc-${customer.id}`,
-    entity: customer.company,
-    entityType: "Customer" as const,
-    type: "Company" as const,
-    submitted: customer.lastActive,
-    documents: 0,
-    risk: customer.kycStatus === "Rejected" ? ("High" as const) : ("Medium" as const),
-    status: customer.kycStatus,
-    reviewer: "Admin",
-    gst: customer.gst,
-    pan: customer.pan,
-    bank: "",
-    notes: "",
-    source: customer.source,
-  }));
-  return [...sellerKyc, ...customerKyc];
+  const rows = await listAll<Record<string, unknown>>("/admin/kyc");
+  return rows.map(mapAdminKycRow);
 }
 
 export async function listAdminProcurements() {

@@ -11,13 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { downloadCsv } from "@/lib/csv";
+import { downloadCsv, downloadCsvText } from "@/lib/csv";
 import { gradeExportRows } from "@/lib/grade-utils";
-import { applyFilters, toExportRow } from "@/lib/procurement";
+import { exportProcurement } from "@/lib/api/procurement-workbench";
 import { audienceLabel, CATEGORY_LABELS, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/push-notification-utils";
 import { useDataStore } from "@/store/data-store";
 import { useGradeStore } from "@/store/grade-store";
-import { useProcurementStore } from "@/store/procurement-store";
 import { usePushNotificationStore } from "@/store/push-notification-store";
 import { useUiStore } from "@/store/ui-store";
 
@@ -86,14 +85,14 @@ export function QuickExport() {
         })),
       );
     } else if (key === "procurement") {
-      const state = useProcurementStore.getState();
-      const visible = applyFilters(state.procurements, {
-        search: state.filters.search,
-        quick: state.filters.quick,
-        kpi: state.filters.kpi,
-        advanced: state.filters.advanced,
-      });
-      downloadCsv("petrotrade-procurement-export.csv", visible.map(toExportRow));
+      void exportProcurement({})
+        .then((file) => {
+          downloadCsvText(file.filename, file.csv);
+          toast.success(`Exported ${file.rowCount} procurement records`);
+          setExportOpen(false);
+        })
+        .catch(() => toast.error("Procurement export failed."));
+      return;
     } else if (key === "receivables") {
       downloadCsv(
         "petrotrade-receivables.csv",

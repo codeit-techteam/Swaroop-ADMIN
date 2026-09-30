@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { AUTH_COOKIE } from "@/lib/constants";
 
 const PUBLIC_PATHS = new Set(["/login"]);
-const PUBLIC_PREFIXES = ["/api/grades", "/api/push-notifications"];
+// `/api/v1` is the dev proxy to the backend, which enforces its own bearer-token auth.
+const PUBLIC_PREFIXES = ["/api/grades", "/api/push-notifications", "/api/v1"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

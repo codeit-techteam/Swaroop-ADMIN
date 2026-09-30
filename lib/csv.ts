@@ -63,3 +63,7 @@ function triggerDownload(filename: string, blob: Blob) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export function downloadCsvText(filename: string, csv: string) {
+  triggerDownload(filename, new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+}

@@ -15,7 +15,13 @@ export type AdminRole =
   | "SUPPORT";
 
 export type EntityStatus = "Active" | "Inactive" | "Suspended";
-export type KycStatus = "Pending" | "Under Review" | "Approved" | "Rejected" | "Expired";
+export type KycStatus =
+  | "Pending"
+  | "Under Review"
+  | "Changes Requested"
+  | "Approved"
+  | "Rejected"
+  | "Expired";
 export type RiskLevel = "Low" | "Medium" | "High";
 export type PlatformStatus = "Operational" | "Degraded" | "Outage";
 
@@ -245,6 +251,55 @@ export interface KycRecord {
   bank: string;
   notes: string;
   source: AppSource;
+  /** Present on records loaded from GET /admin/kyc. */
+  entityId?: string;
+  contact?: string;
+  phone?: string;
+  email?: string;
+  entityStatus?: string;
+  documentsPending?: number;
+  documentsRejected?: number;
+  documentsMissing?: string[];
+  reviewedAt?: string | null;
+  rejectedReason?: string | null;
+  changeRequest?: KycChangeRequest | null;
+}
+
+export interface KycChangeRequest {
+  reason: string;
+  slots: string[];
+  documentIds: string[];
+  requestedAt: string;
+}
+
+export interface AdminKycDocument {
+  id: string;
+  slot: string | null;
+  slotLabel: string;
+  fileName: string;
+  mimeType: string | null;
+  fileSizeBytes: number | null;
+  status: PlatformDocument["status"];
+  rejectionReason: string | null;
+  source: AppSource | null;
+  uploadedAt: string;
+  reviewedAt: string | null;
+}
+
+export interface AdminKycSlot {
+  slot: string;
+  name: string;
+  description: string;
+  required: boolean;
+  document: AdminKycDocument | null;
+}
+
+export interface AdminKycDetail {
+  record: KycRecord;
+  slots: AdminKycSlot[];
+  blockers: string[];
+  legalName: string | null;
+  address: string | null;
 }
 
 export type ProcurementStatus =
@@ -414,6 +469,49 @@ export interface PlatformDocument {
   uploadedAt: string;
   status: "Pending" | "Verified" | "Rejected" | "Revision Requested";
   source: AppSource;
+  fileName?: string;
+  documentNumber?: string | null;
+  mimeType?: string | null;
+  fileSizeBytes?: number | null;
+  /** Seller onboarding slot (gst, pan, aadhaar, cancelledCheque). */
+  slot?: string | null;
+  isOnboarding?: boolean;
+  rejectionReason?: string | null;
+  verificationNotes?: string | null;
+  reviewedAt?: string | null;
+  uploadedBy?: { name: string; email: string; phone: string } | null;
+  seller?: {
+    id: string;
+    status: string;
+    onboardingStatus: string | null;
+    onboardingSubmittedAt: string | null;
+  } | null;
+  organization?: { gstin: string; pan: string } | null;
+}
+
+export interface AdminSellerOnboardingDocument {
+  id: string;
+  slot: string | null;
+  category: string;
+  fileName: string;
+  mimeType: string | null;
+  status: PlatformDocument["status"];
+  rejectionReason: string | null;
+  uploadedAt: string;
+}
+
+export interface AdminSellerReview {
+  id: string;
+  company: string;
+  status: string;
+  onboardingStatus: string | null;
+  submittedAt: string | null;
+  gstin: string;
+  pan: string;
+  contact: string;
+  email: string;
+  phone: string;
+  documents: AdminSellerOnboardingDocument[];
 }
 
 export interface AuditLog {

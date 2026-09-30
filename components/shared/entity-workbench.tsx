@@ -34,11 +34,15 @@ interface EntityWorkbenchProps<T> {
   drawerTitle?: (row: T) => string;
   drawerDescription?: (row: T) => string;
   drawerFooter?: (row: T, close: () => void) => ReactNode;
+  drawerClassName?: string;
   emptyTitle: string;
   emptyDescription: string;
   exportName: string;
   exportRow: (row: T) => Record<string, string | number | boolean | null | undefined>;
   initialSelectedId?: string | null;
+  /** Controlled selection; omit both to let the workbench manage it. */
+  selectedId?: string | null;
+  onSelectedIdChange?: (id: string | null) => void;
   actions?: ReactNode;
   pageSize?: number;
   loading?: boolean;
@@ -61,11 +65,14 @@ export function EntityWorkbench<T>({
   drawerTitle,
   drawerDescription,
   drawerFooter,
+  drawerClassName,
   emptyTitle,
   emptyDescription,
   exportName,
   exportRow,
   initialSelectedId,
+  selectedId: controlledSelectedId,
+  onSelectedIdChange,
   actions,
   pageSize = 5,
   loading = false,
@@ -74,11 +81,16 @@ export function EntityWorkbench<T>({
 }: EntityWorkbenchProps<T>) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const selectedId = controlledSelectedId !== undefined ? controlledSelectedId : internalSelectedId;
+  const setSelectedId = (id: string | null) => {
+    setInternalSelectedId(id);
+    onSelectedIdChange?.(id);
+  };
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id");
-    if (id) setSelectedId(id);
+    if (id) setInternalSelectedId(id);
   }, []);
 
   const filtered = useMemo(() => {
@@ -210,6 +222,7 @@ export function EntityWorkbench<T>({
         title={selected ? drawerTitle?.(selected) ?? title : title}
         description={selected ? drawerDescription?.(selected) : undefined}
         footer={selected && drawerFooter ? drawerFooter(selected, () => setSelectedId(null)) : undefined}
+        contentClassName={drawerClassName}
       >
         {selected ? renderDetails(selected) : null}
       </DetailDrawer>

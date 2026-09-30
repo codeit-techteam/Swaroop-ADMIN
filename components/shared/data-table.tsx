@@ -35,6 +35,8 @@ interface DataTableProps<T> {
   emptyDescription?: string;
   emptyAction?: ReactNode;
   pageSize?: number;
+  /** Render the provided rows as one server page. Sorting and paging stay with the caller. */
+  manual?: boolean;
 }
 
 export function DataTable<T>({
@@ -47,13 +49,14 @@ export function DataTable<T>({
   emptyDescription = "Try changing your filters.",
   emptyAction,
   pageSize = 5,
+  manual = false,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
 
   const sorted = useMemo(() => {
-    if (!sortKey) return rows;
+    if (manual || !sortKey) return rows;
     const column = columns.find((item) => item.key === sortKey);
     if (!column?.accessor) return rows;
     return [...rows].sort((a, b) => {
@@ -63,11 +66,13 @@ export function DataTable<T>({
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [rows, sortKey, sortDir, columns]);
+  }, [rows, sortKey, sortDir, columns, manual]);
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(Math.max(0, page), pageCount - 1);
-  const pageRows = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const pageRows = manual
+    ? sorted
+    : sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
   const canPrev = safePage > 0;
   const canNext = safePage < pageCount - 1;
   const rowIds = rows.map(getRowId).join("|");
@@ -133,6 +138,7 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
+      {manual ? null : (
       <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
         <span>
           {sorted.length} records · page {safePage + 1} of {pageCount}
@@ -158,6 +164,7 @@ export function DataTable<T>({
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

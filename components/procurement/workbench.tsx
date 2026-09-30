@@ -1,207 +1,229 @@
 "use client";
 
 import {
-  BarChart3,
-  CheckCircle2,
   Clock3,
   Columns3,
   Download,
-  Factory,
   Filter,
-  GitCompare,
   Handshake,
   MoreHorizontal,
   Plus,
-  Scale,
   Search,
   ShieldAlert,
   Table2,
-  Truck,
   Wallet,
   X,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ProcurementDetailDrawer } from "@/components/procurement/detail-drawer";
-import { ProcurementModals } from "@/components/procurement/modals";
-import { ProcurementQueueBoard } from "@/components/procurement/queue-board";
+import { ProcurementRecordPanel } from "@/components/procurement/procurement-record-panel";
 import { DataTable } from "@/components/shared/data-table";
-import { ErrorState, KpiSkeleton, TableSkeleton } from "@/components/shared/states";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
-import { SourceBadge } from "@/components/shared/source-badge";
+import { ErrorState, KpiSkeleton, TableSkeleton } from "@/components/shared/states";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { downloadCsv } from "@/lib/csv";
-import { formatInrExact, formatNumber, formatRelativeTime } from "@/lib/format";
-import {
-  advancedFilterCount,
-  applyFilters,
-  computeKpis,
-  EMPTY_ADVANCED_FILTERS,
-  formatKpiDays,
-  formatOpenPoValue,
-  needsAttention,
-  nextActionLabel,
-  PROCUREMENT_STATUSES,
-  rowAccent,
-  toExportRow,
-  type AdvancedFilters,
-  type KpiFilter,
-  type QuickFilter,
-} from "@/lib/procurement";
+  exportProcurement,
+  getProcurementActivity,
+  getProcurementQueue,
+  getProcurementSummary,
+  listProcurementRecords,
+  procurementErrorMessage,
+  type ProcurementActivityItem,
+  type ProcurementListQuery,
+  type ProcurementQueueGroup,
+  type ProcurementRecord,
+  type ProcurementSummary,
+  type WorkbenchBucket,
+} from "@/lib/api/procurement-workbench";
+import { downloadCsvText } from "@/lib/csv";
+import { formatInrDecimal, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useProcurementStore } from "@/store/procurement-store";
-import type { ProcurementStatus } from "@/types";
 
-const QUICK_FILTERS: { label: string; value: QuickFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Needs action", value: "needs-action" },
-  { label: "Negotiation", value: "Negotiation" },
-  { label: "Urgent", value: "Urgent Review" },
-  { label: "Pending Inv.", value: "Pending Inv." },
-  { label: "Approved", value: "Approved" },
+const PAGE_SIZE = 25;
+
+const QUICK_FILTERS: { label: string; value: WorkbenchBucket; countKey: keyof ProcurementSummary["counts"] }[] = [
+  { label: "All", value: "all", countKey: "all" },
+  { label: "Needs action", value: "needs_action", countKey: "needsAction" },
+  { label: "Negotiation", value: "negotiation", countKey: "negotiation" },
+  { label: "Urgent", value: "urgent", countKey: "urgent" },
+  { label: "Pending Inv.", value: "pending_invoice", countKey: "pendingInvoice" },
+  { label: "Approved", value: "approved", countKey: "approved" },
 ];
 
-const KPI_CHIP_LABEL: Record<Exclude<KpiFilter, null>, string> = {
-  "pending-approvals": "Pending approvals",
-  "avg-time": "In-flight cycle",
-  negotiations: "Active negotiations",
-  "open-po": "Open PO value",
+const STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "SOURCING",
+  "OFFER_RECEIVED",
+  "NEGOTIATION",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "CONVERTED_TO_ORDER",
+  "REJECTED",
+  "CANCELLED",
+  "EXPIRED",
+];
+
+const PAYMENT_OPTIONS = [
+  "ADVANCE",
+  "BEFORE_DISPATCH",
+  "ON_LOADING",
+  "ON_DELIVERY",
+  "CREDIT",
+  "PARTIAL_PAYMENT",
+  "MILESTONE_PAYMENT",
+];
+
+interface AdvancedFilters {
+  status: string;
+  priority: string;
+  customer: string;
+  seller: string;
+  paymentOption: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+const EMPTY_ADVANCED: AdvancedFilters = {
+  status: "",
+  priority: "",
+  customer: "",
+  seller: "",
+  paymentOption: "",
+  dateFrom: "",
+  dateTo: "",
 };
 
 export function ProcurementWorkbench({ initialView }: { initialView?: "table" | "queue" } = {}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const procurements = useProcurementStore((s) => s.procurements);
-  const filters = useProcurementStore((s) => s.filters);
-  const viewMode = useProcurementStore((s) => s.viewMode);
-  const activities = useProcurementStore((s) => s.activities);
-  const selectedId = useProcurementStore((s) => s.selectedId);
-  const setSearchQuery = useProcurementStore((s) => s.setSearchQuery);
-  const setQuickFilter = useProcurementStore((s) => s.setQuickFilter);
-  const setKpiFilter = useProcurementStore((s) => s.setKpiFilter);
-  const setAdvancedFilters = useProcurementStore((s) => s.setAdvancedFilters);
-  const clearFilters = useProcurementStore((s) => s.clearFilters);
-  const setViewMode = useProcurementStore((s) => s.setViewMode);
-  const selectProcurement = useProcurementStore((s) => s.selectProcurement);
-  const openModal = useProcurementStore((s) => s.openModal);
-  const hydrate = useProcurementStore((s) => s.hydrate);
-  const loading = useProcurementStore((s) => s.loading);
-  const loadError = useProcurementStore((s) => s.loadError);
+  const [viewMode, setViewMode] = useState<"table" | "queue">(initialView ?? "table");
+  const [bucket, setBucket] = useState<WorkbenchBucket>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [advanced, setAdvanced] = useState<AdvancedFilters>(EMPTY_ADVANCED);
+  const [page, setPage] = useState(1);
+  const [summary, setSummary] = useState<ProcurementSummary | null>(null);
+  const [rows, setRows] = useState<ProcurementRecord[]>([]);
+  const [meta, setMeta] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 });
+  const [activity, setActivity] = useState<ProcurementActivityItem[]>([]);
+  const [queue, setQueue] = useState<ProcurementQueueGroup[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [explainCreate, setExplainCreate] = useState(false);
 
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
-    if (initialView) setViewMode(initialView);
-  }, [initialView, setViewMode]);
+    setPage(1);
+  }, [search, bucket, advanced]);
 
-  useEffect(() => {
-    const id = searchParams.get("id");
-    if (id) selectProcurement(id);
-  }, [searchParams, selectProcurement]);
-
-  const rows = useMemo(
-    () =>
-      applyFilters(procurements, {
-        search: filters.search,
-        quick: filters.quick,
-        kpi: filters.kpi,
-        advanced: filters.advanced,
-      }),
-    [procurements, filters],
+  const query = useMemo<ProcurementListQuery>(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      search: search || undefined,
+      bucket,
+      status: advanced.status || undefined,
+      priority: advanced.priority || undefined,
+      customer: advanced.customer || undefined,
+      seller: advanced.seller || undefined,
+      paymentOption: advanced.paymentOption || undefined,
+      dateFrom: advanced.dateFrom || undefined,
+      dateTo: advanced.dateTo || undefined,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+    }),
+    [page, search, bucket, advanced],
   );
 
-  const kpis = useMemo(() => computeKpis(procurements), [procurements]);
-  const advCount = advancedFilterCount(filters.advanced);
-  const commodities = [...new Set(procurements.map((item) => item.commodity))];
-  const suppliers = [...new Set(procurements.map((item) => item.supplier))];
-  const customers = [...new Set(procurements.map((item) => item.customerName))];
-  const sellers = [...new Set(procurements.map((item) => item.sellerName).filter(Boolean))] as string[];
-
-  const filterCounts = useMemo(() => {
-    const counts: Record<QuickFilter, number> = {
-      all: procurements.length,
-      "needs-action": 0,
-      Negotiation: 0,
-      "Urgent Review": 0,
-      "Pending Inv.": 0,
-      Approved: 0,
-    };
-    for (const item of procurements) {
-      if (needsAttention(item.status)) counts["needs-action"] += 1;
-      if (item.status === "Negotiation") counts.Negotiation += 1;
-      if (item.status === "Urgent Review") counts["Urgent Review"] += 1;
-      if (item.status === "Pending Inv.") counts["Pending Inv."] += 1;
-      if (item.status === "Approved") counts.Approved += 1;
+  const load = async (mode: "initial" | "refresh" = "refresh") => {
+    if (mode === "initial") setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+    try {
+      const [nextSummary, nextActivity, list] = await Promise.all([
+        getProcurementSummary(),
+        getProcurementActivity(12),
+        viewMode === "table" ? listProcurementRecords(query) : Promise.resolve(null),
+      ]);
+      setSummary(nextSummary);
+      setActivity(nextActivity);
+      if (list) {
+        setRows(list.items);
+        setMeta(list.meta);
+      }
+      if (viewMode === "queue") setQueue(await getProcurementQueue());
+    } catch (err) {
+      setError(procurementErrorMessage(err, "Unable to load the procurement workbench."));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    return counts;
-  }, [procurements]);
-
-  const attentionItems = useMemo(
-    () =>
-      procurements
-        .filter((item) => needsAttention(item.status))
-        .sort((a, b) => attentionRank(a.status) - attentionRank(b.status))
-        .slice(0, 4),
-    [procurements],
-  );
-
-  const hasActiveFilters =
-    Boolean(filters.search) || filters.quick !== "all" || Boolean(filters.kpi) || advCount > 0;
-
-  const exportRows = () => {
-    downloadCsv("petrotrade-procurement-export.csv", rows.map(toExportRow));
-    toast.success("Exported petrotrade-procurement-export.csv");
   };
 
-  const openComparison = () => {
-    const currentId = useProcurementStore.getState().selectedId;
-    const current = procurements.find((item) => item.id === currentId && item.quotations.length > 0);
-    const fallback = procurements.find((item) => item.quotations.length > 0);
-    const target = current ?? fallback;
-    if (!target) {
-      toast.message("No quotations are available to compare yet.");
-      return;
+  useEffect(() => {
+    void load(summary ? "refresh" : "initial");
+    // summary identity is intentionally excluded so polling and filter changes share one loader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, viewMode]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void getProcurementSummary().then(setSummary).catch(() => undefined);
+      void getProcurementActivity(12).then(setActivity).catch(() => undefined);
+      if (viewMode === "queue") void getProcurementQueue().then(setQueue).catch(() => undefined);
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, [viewMode]);
+
+  const advancedCount = Object.values(advanced).filter(Boolean).length;
+  const hasFilters = Boolean(search) || bucket !== "all" || advancedCount > 0;
+  const emptyCatalog = (summary?.counts.all ?? 0) === 0 && !hasFilters;
+
+  const exportRows = async () => {
+    setExporting(true);
+    try {
+      const file = await exportProcurement(query);
+      downloadCsvText(file.filename, file.csv);
+      toast.success(`Exported ${file.rowCount} procurement records`);
+    } catch (err) {
+      toast.error(procurementErrorMessage(err, "Export failed."));
+    } finally {
+      setExporting(false);
     }
-    selectProcurement(target.id);
   };
 
-  const openCreatePo = () => {
-    const currentId = useProcurementStore.getState().selectedId;
-    const current =
-      procurements.find((item) => item.id === currentId && item.status === "Approved") ??
-      procurements.find((item) => item.status === "Approved");
-    if (!current) {
-      toast.message("Approve a request first, then issue the purchase order.");
-      return;
-    }
-    selectProcurement(current.id);
-    openModal({ type: "create-po", id: current.id });
-  };
-
-  if (loading) {
+  if (loading && !summary) {
     return (
       <div className="flex flex-col gap-5">
         <KpiSkeleton />
@@ -210,8 +232,8 @@ export function ProcurementWorkbench({ initialView }: { initialView?: "table" | 
     );
   }
 
-  if (loadError) {
-    return <ErrorState title="Unable to load purchase requests." description={loadError} onRetry={() => void hydrate()} />;
+  if (error && !summary) {
+    return <ErrorState title="Unable to load purchase requests." description={error} onRetry={() => void load("initial")} />;
   }
 
   return (
@@ -223,528 +245,279 @@ export function ProcurementWorkbench({ initialView }: { initialView?: "table" | 
         actions={
           <>
             <div className="inline-flex rounded-md border bg-white p-0.5 shadow-soft">
-              <Button
-                size="sm"
-                variant={viewMode === "table" ? "secondary" : "ghost"}
-                className={cn("h-8", viewMode === "table" && "bg-slate-900 text-white hover:bg-slate-800 hover:text-white")}
-                onClick={() => setViewMode("table")}
-              >
-                <Table2 className="size-3.5" />
-                Table
+              <Button size="sm" variant={viewMode === "table" ? "secondary" : "ghost"} className={cn("h-8", viewMode === "table" && "bg-slate-900 text-white hover:bg-slate-800 hover:text-white")} onClick={() => setViewMode("table")}>
+                <Table2 className="size-3.5" /> Table
               </Button>
-              <Button
-                size="sm"
-                variant={viewMode === "queue" ? "secondary" : "ghost"}
-                className={cn("h-8", viewMode === "queue" && "bg-slate-900 text-white hover:bg-slate-800 hover:text-white")}
-                onClick={() => setViewMode("queue")}
-              >
-                <Columns3 className="size-3.5" />
-                Queue
+              <Button size="sm" variant={viewMode === "queue" ? "secondary" : "ghost"} className={cn("h-8", viewMode === "queue" && "bg-slate-900 text-white hover:bg-slate-800 hover:text-white")} onClick={() => setViewMode("queue")}>
+                <Columns3 className="size-3.5" /> Queue
               </Button>
             </div>
-            <Button size="sm" variant="outline" onClick={exportRows}>
-              <Download className="size-3.5" />
-              Export
+            <Button size="sm" variant="outline" disabled={exporting} onClick={() => void exportRows()}>
+              <Download className="size-3.5" /> {exporting ? "Exporting…" : "Export"}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <MoreHorizontal className="size-3.5" />
-                  More
-                </Button>
+                <Button size="sm" variant="outline"><MoreHorizontal className="size-3.5" /> More</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem onClick={() => router.push("/sellers")}>
-                  <Factory className="size-3.5" />
-                  Add seller
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openComparison}>
-                  <GitCompare className="size-3.5" />
-                  Compare quotations
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openCreatePo}>
-                  <CheckCircle2 className="size-3.5" />
-                  Create PO
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/analytics")}>
-                  <BarChart3 className="size-3.5" />
-                  Reports
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/logistics")}>
-                  <Truck className="size-3.5" />
-                  Shipment tracking
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/orders")}>Purchase orders</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/payments")}>Payments</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/logistics")}>Dispatch and shipment</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" onClick={() => openModal({ type: "new-procurement" })}>
-              <Plus className="size-3.5" />
-              New Procurement
+            <Button size="sm" onClick={() => setExplainCreate(true)}>
+              <Plus className="size-3.5" /> New Procurement
             </Button>
           </>
         }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Pending Approvals"
-          value={String(kpis.pendingApprovals).padStart(2, "0")}
-          hint="Waiting on Admin review"
-          icon={ShieldAlert}
-          tone="warning"
-          active={filters.kpi === "pending-approvals"}
-          onClick={() => setKpiFilter("pending-approvals")}
-        />
-        <KpiCard
-          label="Avg Cycle Time"
-          value={formatKpiDays(kpis.avgProcDays)}
-          hint="Open requests in the pipeline"
-          icon={Clock3}
-          active={filters.kpi === "avg-time"}
-          onClick={() => setKpiFilter("avg-time")}
-        />
-        <KpiCard
-          label="Active Negotiations"
-          value={String(kpis.activeNegotiations).padStart(2, "0")}
-          hint="Quotes still in play"
-          icon={Handshake}
-          active={filters.kpi === "negotiations"}
-          onClick={() => setKpiFilter("negotiations")}
-        />
-        <KpiCard
-          label="Open PO Value"
-          value={formatOpenPoValue(kpis.openPoValue)}
-          hint="Issued, not yet completed"
-          icon={Wallet}
-          active={filters.kpi === "open-po"}
-          onClick={() => setKpiFilter("open-po")}
-        />
+        <KpiCard label="Pending Approvals" value={pad(summary?.pendingApprovals)} hint="Waiting on admin review" icon={ShieldAlert} tone="warning" active={bucket === "pending_approvals"} onClick={() => setBucket(bucket === "pending_approvals" ? "all" : "pending_approvals")} />
+        <KpiCard label="Pending Seller Responses" value={pad(summary?.pendingSellerResponses)} hint="Open requests awaiting a seller" icon={Clock3} active={bucket === "pending_seller"} onClick={() => setBucket(bucket === "pending_seller" ? "all" : "pending_seller")} />
+        <KpiCard label="Active Negotiations" value={pad(summary?.activeNegotiations)} hint="Counter offers still in play" icon={Handshake} active={bucket === "negotiation"} onClick={() => setBucket(bucket === "negotiation" ? "all" : "negotiation")} />
+        <KpiCard label="Open PO Value" value={formatInrDecimal(summary?.openPoValue)} hint="Issued, not yet completed" icon={Wallet} active={bucket === "open_po"} onClick={() => setBucket(bucket === "open_po" ? "all" : "open_po")} />
       </div>
-
-      {attentionItems.length > 0 && filters.quick === "all" && !filters.kpi ? (
-        <section className="overflow-hidden rounded-md border border-amber-200 bg-amber-50/70 shadow-soft">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 px-4 py-2.5">
-            <div>
-              <p className="text-sm font-semibold text-amber-950">Needs your attention</p>
-              <p className="text-xs text-amber-800/80">Urgent reviews, inventory holds and items waiting on Admin.</p>
-            </div>
-            <Button size="sm" variant="outline" className="bg-white" onClick={() => setQuickFilter("needs-action")}>
-              View all {filterCounts["needs-action"]}
-            </Button>
-          </div>
-          <ul className="divide-y divide-amber-100 bg-white/70">
-            {attentionItems.map((item) => (
-              <li
-                key={item.id}
-                className="flex w-full flex-wrap items-center gap-3 px-4 py-2.5 hover:bg-white"
-              >
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 flex-wrap items-center gap-3 text-left"
-                  onClick={() => selectProcurement(item.id)}
-                >
-                  <span className="w-[108px] shrink-0 text-sm font-medium text-sky-800">{item.id}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{item.commodity}</span>
-                  <span className="hidden min-w-0 flex-1 truncate text-sm text-muted-foreground sm:block">
-                    {item.customerName}
-                  </span>
-                  <StatusBadge value={item.status} />
-                  <span className="hidden text-xs text-muted-foreground lg:block">
-                    {formatRelativeTime(item.updatedAt)}
-                  </span>
-                </button>
-                <RowAction rowId={item.id} status={item.status} compact />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
       <section className="rounded-md border bg-white p-3 shadow-soft">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-            <Input
-              value={filters.search}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search PO, commodity, customer or supplier"
-              className="pl-8"
-              aria-label="Search PO, commodity, customer or supplier"
-            />
+            <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search PO, commodity, customer or supplier" className="pl-8" aria-label="Search PO, commodity, customer or supplier" />
+            {searchInput ? (
+              <button type="button" className="absolute right-2 top-2.5 text-muted-foreground" aria-label="Clear search" onClick={() => setSearchInput("")}>
+                <X className="size-4" />
+              </button>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {QUICK_FILTERS.map((item) => {
-              const active = filters.quick === item.value && !filters.kpi;
-              const count = filterCounts[item.value];
+              const active = bucket === item.value;
+              const count = summary?.counts[item.countKey] ?? 0;
               return (
-                <Button
-                  key={item.value}
-                  type="button"
-                  size="sm"
-                  variant={active ? "default" : "outline"}
-                  className={cn(item.value === "needs-action" && !active && "border-amber-300 text-amber-800")}
-                  onClick={() => setQuickFilter(item.value)}
-                >
+                <Button key={item.value} type="button" size="sm" variant={active ? "default" : "outline"} className={cn(item.value === "needs_action" && !active && "border-amber-300 text-amber-800")} onClick={() => setBucket(item.value)}>
                   {item.label}
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 text-[10px] font-semibold",
-                      active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600",
-                    )}
-                  >
-                    {count}
-                  </span>
+                  <span className={cn("rounded-full px-1.5 text-[10px] font-semibold", active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600")}>{count}</span>
                 </Button>
               );
             })}
-            <AdvancedFilterPopover
-              value={filters.advanced}
-              count={advCount}
-              commodities={commodities}
-              suppliers={suppliers}
-              customers={customers}
-              sellers={sellers}
-              onChange={setAdvancedFilters}
-              onClear={clearFilters}
-            />
+            <AdvancedFilterPopover value={advanced} count={advancedCount} onApply={setAdvanced} onClear={() => setAdvanced(EMPTY_ADVANCED)} />
           </div>
         </div>
-        {hasActiveFilters ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {rows.length} result{rows.length === 1 ? "" : "s"}
-            </span>
-            {filters.search ? <FilterChip label={`Search · ${filters.search}`} onClear={() => setSearchQuery("")} /> : null}
-            {filters.quick !== "all" ? (
-              <FilterChip
-                label={QUICK_FILTERS.find((item) => item.value === filters.quick)?.label ?? filters.quick}
-                onClear={() => setQuickFilter("all")}
-              />
-            ) : null}
-            {filters.kpi ? <FilterChip label={KPI_CHIP_LABEL[filters.kpi]} onClear={() => setKpiFilter(filters.kpi)} /> : null}
-            {advCount > 0 ? (
-              <FilterChip label={`${advCount} advanced`} onClear={() => setAdvancedFilters(EMPTY_ADVANCED_FILTERS)} />
-            ) : null}
-            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={clearFilters}>
-              Clear all
-            </Button>
-          </div>
-        ) : (
-          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
-            Showing {rows.length} records. Click a KPI or chip to focus the queue.
-          </p>
-        )}
+        <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+          {refreshing ? "Refreshing records…" : hasFilters ? `${meta.total} matching records.` : `Showing ${meta.total} records. Click a KPI or chip to focus the queue.`}
+        </p>
       </section>
+
+      {error ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
         {viewMode === "table" ? (
-          <DataTable
-            rows={rows}
-            getRowId={(row) => row.id}
-            pageSize={8}
-            emptyTitle="No procurement records found"
-            emptyDescription="Try a different search or clear the active filters."
-            emptyAction={
-              hasActiveFilters ? (
-                <Button size="sm" variant="outline" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => openModal({ type: "new-procurement" })}>
-                  <Plus className="size-3.5" />
-                  New Procurement
-                </Button>
-              )
-            }
-            onRowClick={(row) => selectProcurement(row.id)}
-            getRowClassName={(row) =>
-              cn(
-                selectedId === row.id && "bg-sky-50/80",
-                rowAccent(row.status) === "urgent" && "bg-red-50/50 shadow-[inset_3px_0_0_0_#ef4444]",
-                rowAccent(row.status) === "wait" && "shadow-[inset_3px_0_0_0_#f59e0b]",
-                rowAccent(row.status) === "ready" && "shadow-[inset_3px_0_0_0_#10b981]",
-              )
-            }
-            columns={[
-              {
-                key: "id",
-                header: "Order",
-                sortable: true,
-                accessor: (row) => row.id,
-                render: (row) => (
-                  <div className="min-w-[160px]">
-                    <button
-                      type="button"
-                      className="font-medium text-sky-700 hover:underline"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        selectProcurement(row.id);
-                      }}
-                    >
-                      {row.id}
-                    </button>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.commodity}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "customer",
-                header: "Customer",
-                sortable: true,
-                accessor: (row) => row.customerName,
-                render: (row) => (
-                  <div className="min-w-[140px]">
-                    <p className="truncate">{row.customerName}</p>
-                    <SourceBadge source={row.source} className="mt-1" />
-                  </div>
-                ),
-              },
-              { key: "supplier", header: "Supplier", sortable: true, accessor: (row) => row.supplier },
-              {
-                key: "qty",
-                header: "Qty",
-                sortable: true,
-                accessor: (row) => row.quantity,
-                render: (row) => (
-                  <span className="whitespace-nowrap tabular-nums">
-                    {formatNumber(row.quantity)} {row.unit}
-                  </span>
-                ),
-              },
-              {
-                key: "estCost",
-                header: "Estimated Cost",
-                sortable: true,
-                accessor: (row) => row.estimatedCost,
-                render: (row) => <span className="whitespace-nowrap tabular-nums">{formatInrExact(row.estimatedCost)}</span>,
-              },
-              {
-                key: "status",
-                header: "Status",
-                sortable: true,
-                accessor: (row) => row.status,
-                render: (row) => <StatusBadge value={row.status} />,
-              },
-              {
-                key: "waiting",
-                header: "Updated",
-                sortable: true,
-                accessor: (row) => row.updatedAt,
-                render: (row) => (
-                  <span className="whitespace-nowrap text-xs text-muted-foreground">{formatRelativeTime(row.updatedAt)}</span>
-                ),
-              },
-              {
-                key: "action",
-                header: "Action",
-                className: "text-right",
-                render: (row) => <RowAction rowId={row.id} status={row.status} />,
-              },
-            ]}
-          />
+          <div className="min-w-0 space-y-2">
+            <DataTable
+              manual
+              rows={rows}
+              getRowId={(row) => row.id}
+              emptyTitle={emptyCatalog ? "No procurement records yet" : "No procurement records found"}
+              emptyDescription={emptyCatalog ? "Once customer purchase requests enter the procurement pipeline, they will appear here." : "Try changing your search or filters."}
+              emptyAction={hasFilters ? <Button size="sm" variant="outline" onClick={() => { setSearchInput(""); setSearch(""); setBucket("all"); setAdvanced(EMPTY_ADVANCED); }}>Clear filters</Button> : undefined}
+              onRowClick={(row) => setSelectedId(row.id)}
+              getRowClassName={(row) => cn(selectedId === row.id && "bg-sky-50/80", row.ops.urgent && "bg-red-50/40 shadow-[inset_3px_0_0_0_#ef4444]", row.ops.actionRequired && !row.ops.urgent && "shadow-[inset_3px_0_0_0_#f59e0b]")}
+              columns={[
+                {
+                  key: "pr",
+                  header: "PR",
+                  render: (row) => (
+                    <div className="min-w-[150px]">
+                      <Link href={`/procurement/${row.id}`} className="font-medium text-sky-700 hover:underline" onClick={(event) => event.stopPropagation()}>{row.referenceNumber}</Link>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.ops.gradeName}</p>
+                    </div>
+                  ),
+                },
+                { key: "po", header: "PO", render: (row) => <span className="whitespace-nowrap text-sm">{row.ops.poNumber ?? "—"}</span> },
+                { key: "customer", header: "Customer", render: (row) => <span className="block max-w-[180px] truncate" title={row.ops.customerName}>{row.ops.customerName}</span> },
+                { key: "seller", header: "Seller", render: (row) => <span className="block max-w-[180px] truncate" title={row.ops.sellerName ?? "Unassigned"}>{row.ops.sellerName ?? "Unassigned"}</span> },
+                { key: "qty", header: "Qty", render: (row) => <span className="whitespace-nowrap tabular-nums">{formatQty(row.ops.quantity)} {row.ops.unit}</span> },
+                { key: "value", header: "Value", render: (row) => <span className="whitespace-nowrap tabular-nums">{formatInrDecimal(row.ops.totalAmount)}</span> },
+                { key: "status", header: "Status", render: (row) => <StatusBadge value={row.ops.statusLabel} /> },
+                { key: "action", header: "Action", render: (row) => <span className="block max-w-[200px] truncate text-xs text-muted-foreground" title={row.ops.actionReason ?? undefined}>{row.ops.actionReason ?? (row.ops.deadlineLabel || "—")}</span> },
+                { key: "updated", header: "Updated", render: (row) => <span className="whitespace-nowrap text-xs text-muted-foreground" title={row.updatedAt}>{formatRelativeTime(row.updatedAt)}</span> },
+              ]}
+            />
+            {rows.length > 0 ? (
+              <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+                <span>{meta.total} records · page {meta.page} of {meta.totalPages}</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+                  <Button size="sm" variant="outline" disabled={page >= meta.totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         ) : (
-          <ProcurementQueueBoard />
+          <QueueView groups={queue} onOpen={setSelectedId} />
         )}
 
         <aside className="rounded-md border bg-white p-4 shadow-soft xl:sticky xl:top-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold">Live activity</h2>
-              <p className="text-[11px] text-muted-foreground">Latest moves across the queue</p>
+              <p className="text-[11px] text-muted-foreground">Latest procurement events</p>
             </div>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              {activities.length}
-            </span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{activity.length}</span>
           </div>
-          <ol className="max-h-[520px] space-y-1 overflow-y-auto pr-1">
-            {activities.slice(0, 12).map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-slate-50"
-                  onClick={() => selectProcurement(item.referenceId)}
-                >
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm leading-snug">{item.action}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {item.actor} · {item.referenceId}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{formatRelativeTime(item.timestamp)}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Activity appears here as purchase requests move through sourcing, negotiation and purchase orders.</p>
+          ) : (
+            <ol className="max-h-[520px] space-y-1 overflow-y-auto pr-1">
+              {activity.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className="flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-slate-50" onClick={() => setSelectedId(item.purchaseRequestId)}>
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-snug">{item.message}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{item.actorName}</p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground" title={item.createdAt}>{formatRelativeTime(item.createdAt)}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
         </aside>
       </div>
 
-      <ProcurementDetailDrawer />
-      <ProcurementModals />
+      <Sheet open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) setSelectedId(null); }}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader className="sr-only"><SheetTitle>Procurement detail</SheetTitle></SheetHeader>
+          {selectedId ? (
+            <>
+              <div className="mb-3 text-right">
+                <Link href={`/procurement/${selectedId}`} className="text-xs font-medium text-sky-700 hover:underline">Open full record</Link>
+              </div>
+              <ProcurementRecordPanel id={selectedId} onChanged={() => void load("refresh")} />
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={explainCreate} onOpenChange={setExplainCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Procurement starts with the customer</DialogTitle>
+            <DialogDescription>
+              Purchase requests are created in the Customer app. This workbench reviews those requests, follows negotiation, and tracks the purchase order, proforma invoice, payment and dispatch that the backend creates after commercial acceptance.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setExplainCreate(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function attentionRank(status: ProcurementStatus) {
-  if (status === "Urgent Review") return 0;
-  if (status === "Pending Approval") return 1;
-  if (status === "Pending Inv.") return 2;
-  if (status === "Negotiation") return 3;
-  if (status === "Approved") return 4;
-  return 5;
-}
-
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+function QueueView({ groups, onOpen }: { groups: ProcurementQueueGroup[]; onOpen: (id: string) => void }) {
+  if (groups.length === 0) {
+    return <div className="rounded-md border bg-white p-8 text-sm text-muted-foreground">The operational queue is clear.</div>;
+  }
   return (
-    <button
-      type="button"
-      onClick={onClear}
-      className="inline-flex items-center gap-1 rounded-full border bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-    >
-      {label}
-      <X className="size-3" />
-    </button>
-  );
-}
-
-function RowAction({ rowId, status, compact }: { rowId: string; status: ProcurementStatus; compact?: boolean }) {
-  const openModal = useProcurementStore((s) => s.openModal);
-  const selectProcurement = useProcurementStore((s) => s.selectProcurement);
-  const router = useRouter();
-  const procurements = useProcurementStore((s) => s.procurements);
-  const label = nextActionLabel(status);
-  if (!label) return <span className="text-xs text-muted-foreground">—</span>;
-
-  const emphasize = status === "Urgent Review" || status === "Approved";
-
-  return (
-    <Button
-      size="sm"
-      variant={emphasize ? "default" : "outline"}
-      className={cn(compact && "h-7")}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (label === "Approve") openModal({ type: "approve", id: rowId });
-        else if (label === "Create PO") openModal({ type: "create-po", id: rowId });
-        else if (label === "Confirm") selectProcurement(rowId);
-        else if (label === "Dispatch") openModal({ type: "dispatch", id: rowId });
-        else if (label === "Track") {
-          const shipment = procurements.find((item) => item.id === rowId)?.shipment;
-          router.push(`/logistics?id=${shipment?.shipmentId ?? ""}`);
-        }
-      }}
-    >
-      {label === "Track" ? <Truck className="size-3.5" /> : null}
-      {label === "Approve" && status === "Urgent Review" ? <Scale className="size-3.5" /> : null}
-      {label}
-    </Button>
+    <div className="space-y-4">
+      {groups.map((group) => (
+        <section key={group.key} className="rounded-md border bg-white shadow-soft">
+          <header className="flex items-center justify-between border-b px-4 py-2.5">
+            <h2 className="text-sm font-semibold">{group.label}</h2>
+            <span className="text-xs text-muted-foreground">{group.count} records</span>
+          </header>
+          <ul className="divide-y">
+            {group.items.map((item) => (
+              <li key={item.id}>
+                <button type="button" className="flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50" onClick={() => onOpen(item.id)}>
+                  <span className="w-[150px] shrink-0 text-sm font-medium text-sky-800">{item.referenceNumber}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{item.ops.gradeName}</span>
+                  <span className="hidden min-w-0 flex-1 truncate text-sm text-muted-foreground md:block">{item.ops.customerName}</span>
+                  <StatusBadge value={item.ops.statusLabel} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
 function AdvancedFilterPopover({
   value,
   count,
-  commodities,
-  suppliers,
-  customers,
-  sellers,
-  onChange,
+  onApply,
   onClear,
 }: {
   value: AdvancedFilters;
   count: number;
-  commodities: string[];
-  suppliers: string[];
-  customers: string[];
-  sellers: string[];
-  onChange: (value: AdvancedFilters) => void;
+  onApply: (next: AdvancedFilters) => void;
   onClear: () => void;
 }) {
-  const patch = (partial: Partial<AdvancedFilters>) => onChange({ ...value, ...partial });
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const set = (key: keyof AdvancedFilters, next: string) => setDraft((current) => ({ ...current, [key]: next }));
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Filter className="size-3.5" />
-          Advanced
-          {count > 0 ? (
-            <span className="ml-0.5 rounded-full bg-sky-600 px-1.5 text-[10px] font-semibold text-white">{count}</span>
-          ) : null}
-        </Button>
+        <Button size="sm" variant="outline"><Filter className="size-3.5" /> Advanced{count > 0 ? ` (${count})` : ""}</Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[340px] space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Advanced filters</p>
-          <Button size="sm" variant="ghost" onClick={onClear}>
-            Clear
-          </Button>
+      <PopoverContent align="end" className="w-80 space-y-3">
+        <div className="grid gap-2">
+          <Label>Status</Label>
+          <select className="h-9 rounded-md border px-2 text-sm" value={draft.status} onChange={(event) => set("status", event.target.value)}>
+            <option value="">Any</option>
+            {STATUSES.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
+          </select>
         </div>
-        <FilterSelect
-          label="Status"
-          value={value.status}
-          onChange={(status) => patch({ status: status as AdvancedFilters["status"] })}
-          options={PROCUREMENT_STATUSES}
-        />
-        <FilterSelect label="Commodity" value={value.commodity} onChange={(commodity) => patch({ commodity })} options={commodities} />
-        <FilterSelect label="Supplier" value={value.supplier} onChange={(supplier) => patch({ supplier })} options={suppliers} />
-        <FilterSelect label="Customer" value={value.customer} onChange={(customer) => patch({ customer })} options={customers} />
-        <FilterSelect label="Seller" value={value.seller} onChange={(seller) => patch({ seller })} options={sellers} />
-        <div className="flex flex-col gap-1.5">
-          <Label>Location</Label>
-          <Input value={value.location} onChange={(event) => patch({ location: event.target.value })} placeholder="Delivery location" />
+        <div className="grid gap-2">
+          <Label>Priority</Label>
+          <select className="h-9 rounded-md border px-2 text-sm" value={draft.priority} onChange={(event) => set("priority", event.target.value)}>
+            <option value="">Any</option>
+            {["LOW", "NORMAL", "HIGH", "URGENT"].map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+        </div>
+        <div className="grid gap-2">
+          <Label>Customer</Label>
+          <Input value={draft.customer} onChange={(event) => set("customer", event.target.value)} placeholder="Company name" />
+        </div>
+        <div className="grid gap-2">
+          <Label>Seller</Label>
+          <Input value={draft.seller} onChange={(event) => set("seller", event.target.value)} placeholder="Company name" />
+        </div>
+        <div className="grid gap-2">
+          <Label>Payment terms</Label>
+          <select className="h-9 rounded-md border px-2 text-sm" value={draft.paymentOption} onChange={(event) => set("paymentOption", event.target.value)}>
+            <option value="">Any</option>
+            {PAYMENT_OPTIONS.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>From</Label>
-            <Input type="date" value={value.dateFrom} onChange={(event) => patch({ dateFrom: event.target.value })} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>To</Label>
-            <Input type="date" value={value.dateTo} onChange={(event) => patch({ dateTo: event.target.value })} />
-          </div>
+          <div className="grid gap-2"><Label>From</Label><Input type="date" value={draft.dateFrom} onChange={(event) => set("dateFrom", event.target.value)} /></div>
+          <div className="grid gap-2"><Label>To</Label><Input type="date" value={draft.dateTo} onChange={(event) => set("dateTo", event.target.value)} /></div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Min value</Label>
-            <Input type="number" value={value.valueMin} onChange={(event) => patch({ valueMin: event.target.value })} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Max value</Label>
-            <Input type="number" value={value.valueMax} onChange={(event) => patch({ valueMax: event.target.value })} />
-          </div>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={onClear}>Clear</Button>
+          <Button size="sm" onClick={() => onApply(draft)}>Apply filters</Button>
         </div>
       </PopoverContent>
     </Popover>
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      <Select value={value || "all"} onValueChange={(next) => onChange(next === "all" ? "" : next)}>
-        <SelectTrigger>
-          <SelectValue placeholder="All" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+function pad(value: number | undefined) {
+  return String(value ?? 0).padStart(2, "0");
+}
+
+function formatQty(value: string) {
+  if (!/^-?\d+(\.\d+)?$/.test(value)) return value;
+  const [whole, fraction = ""] = value.split(".");
+  const trimmed = fraction.replace(/0+$/, "");
+  const grouped = new Intl.NumberFormat("en-IN").format(Number(whole || "0"));
+  return trimmed ? `${grouped}.${trimmed}` : grouped;
 }
