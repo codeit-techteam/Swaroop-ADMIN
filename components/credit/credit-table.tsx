@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DataTable, type SimpleColumn } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,6 @@ export function CreditTable<T>({
   emptyTitle: string;
   emptyDescription: string;
 }) {
-  const pageSize = useMemo(() => Math.max(rows.length, 1), [rows.length]);
   return (
     <DataTable
       rows={rows}
@@ -119,7 +118,7 @@ export function CreditTable<T>({
       onRowClick={onRowClick}
       emptyTitle={emptyTitle}
       emptyDescription={emptyDescription}
-      pageSize={pageSize}
+      manual
     />
   );
 }

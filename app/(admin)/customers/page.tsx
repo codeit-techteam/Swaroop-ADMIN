@@ -105,7 +105,7 @@ export default function CustomersPage() {
         )}
         drawerFooter={(r) => (
           <div className="flex gap-2">
-            <Button className="flex-1" variant="outline" onClick={() => router.push("/orders")}>Orders</Button>
+            <Button className="flex-1" variant="outline" onClick={() => router.push(`/customers/${r.id}`)}>Customer 360</Button>
             <Button className="flex-1" variant="destructive" onClick={() => setConfirmId(r.id)}>Suspend</Button>
           </div>
         )}

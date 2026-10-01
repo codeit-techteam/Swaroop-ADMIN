@@ -212,26 +212,45 @@ export interface Dispute {
   assignedTo: string;
 }
 
+export type SupportTicketStatusCode =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_CUSTOMER"
+  | "RESOLVED"
+  | "CLOSED";
+
 export interface SupportTicket {
   id: string;
   ticketNumber: string;
   requesterType: "Customer" | "Seller";
   requesterName: string;
+  requesterEmail: string | null;
+  requesterPhone: string | null;
   organizationName: string;
   category: string;
   subject: string;
   description: string;
+  relatedOrderId: string | null;
+  attachmentName: string | null;
   priority: "Low" | "Medium" | "High" | "Critical";
   status: "Open" | "In Progress" | "Waiting" | "Resolved" | "Closed";
+  statusCode: SupportTicketStatusCode;
+  allowedTransitions: SupportTicketStatusCode[];
+  /** Last message came from the requester and the ticket is still active. */
+  awaitingSupport: boolean;
+  resolutionNote: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
   assignedTo: string;
   createdAt: string;
   updatedAt: string;
   source: AppSource;
   messages: Array<{
     id: string;
-    sender: string;
+    sender: "REQUESTER" | "AGENT" | "SYSTEM";
     senderName: string;
     body: string;
+    attachmentName: string | null;
     createdAt: string;
   }>;
 }

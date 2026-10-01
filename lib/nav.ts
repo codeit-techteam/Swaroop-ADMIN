@@ -1,22 +1,21 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Bell,
   BellRing,
   Building2,
   ClipboardCheck,
   CreditCard,
   Factory,
   FileText,
+  ScrollText,
   Handshake,
   Layers,
   LayoutDashboard,
   PackageSearch,
-  Scale,
-  Settings,
   Headset,
   ShieldAlert,
   ShieldCheck,
+  Ship,
   ShoppingCart,
   Truck,
   Users,
@@ -62,6 +61,7 @@ export const adminNav: NavSection[] = [
     items: [
       { href: "/orders", label: "Orders", icon: ShoppingCart },
       { href: "/offers", label: "Offers", icon: Handshake },
+      { href: "/import-trading", label: "Import Trading", icon: Ship },
     ],
   },
   {
@@ -76,9 +76,7 @@ export const adminNav: NavSection[] = [
     label: "OPERATIONS",
     items: [
       { href: "/logistics", label: "Logistics", icon: Truck },
-      { href: "/logistics/bulk-quotes", label: "Bulk Logistics Quotes", icon: ClipboardCheck },
       { href: "/support", label: "Support Tickets", icon: Headset },
-      { href: "/disputes", label: "Disputes", icon: Scale },
     ],
   },
   {
@@ -95,9 +93,8 @@ export const adminNav: NavSection[] = [
   {
     label: "SYSTEM",
     items: [
-      { href: "/notifications", label: "Notifications", icon: Bell },
       { href: "/documents", label: "Documents", icon: FileText },
-      { href: "/settings", label: "Settings", icon: Settings },
+      { href: "/audit-logs", label: "Audit Logs", icon: ScrollText },
     ],
   },
 ];
@@ -109,12 +106,6 @@ export function isNavActive(pathname: string, href: string) {
   }
   if (href === "/credit") {
     return pathname === "/credit" || pathname.startsWith("/credit/");
-  }
-  if (href === "/logistics/bulk-quotes") {
-    return pathname === "/logistics/bulk-quotes" || pathname.startsWith("/logistics/bulk-quotes/");
-  }
-  if (href === "/logistics") {
-    return pathname === "/logistics" || (pathname.startsWith("/logistics/") && !pathname.startsWith("/logistics/bulk-quotes"));
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

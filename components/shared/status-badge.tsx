@@ -121,6 +121,7 @@ const TONE: Record<string, string> = {
   POSTED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   NONE: "bg-slate-50 text-slate-600 border-slate-200",
   Closed: "bg-slate-50 text-slate-600 border-slate-200",
+  Waiting: "bg-amber-50 text-amber-800 border-amber-200",
   "Ready for Dispatch": "bg-sky-50 text-sky-700 border-sky-200",
   Quoted: "bg-sky-50 text-sky-700 border-sky-200",
   Selected: "bg-emerald-50 text-emerald-700 border-emerald-200",

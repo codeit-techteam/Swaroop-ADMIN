@@ -21,6 +21,7 @@ const ALL_ROUTES = [
   "/master-data",
   "/orders",
   "/offers",
+  "/import-trading",
   "/payments",
   "/credit",
   "/credit-insurance",
@@ -32,15 +33,15 @@ const ALL_ROUTES = [
   "/content",
   "/notifications",
   "/documents",
+  "/audit-logs",
   "/profile",
-  "/settings",
 ] as const;
 
 type RoutePrefix = (typeof ALL_ROUTES)[number];
 
 const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
   SUPER_ADMIN: [...ALL_ROUTES],
-  ADMIN: ALL_ROUTES.filter((route) => route !== "/settings") as RoutePrefix[],
+  ADMIN: [...ALL_ROUTES],
   OPERATIONS: [
     "/dashboard",
     "/procurement",
@@ -49,6 +50,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/support",
     "/disputes",
     "/master-data",
+    "/import-trading",
     "/notifications",
     "/profile",
   ],
@@ -57,6 +59,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/procurement",
     "/sellers",
     "/offers",
+    "/import-trading",
     "/catalog",
     "/master-data",
     "/notifications",
@@ -77,6 +80,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/dashboard",
     "/kyc",
     "/documents",
+    "/audit-logs",
     "/disputes",
     "/master-data",
     "/notifications",
@@ -94,7 +98,7 @@ export function permissionLabels(role: AdminRole) {
   const map: Record<AdminRole, string[]> = {
     SUPER_ADMIN: ["Full platform control", "User & role administration", "Grade Master", "Finance overrides", "Content management", "Push notifications"],
     ADMIN: ["Operational control", "Grade Master", "KYC & offers review", "Order management", "Analytics", "Push notifications"],
-    OPERATIONS: ["Orders", "Procurement", "Logistics", "Bulk Logistics Quotes", "Support Tickets", "Disputes", "Grade Master (view)"],
+    OPERATIONS: ["Orders", "Procurement", "Logistics", "Support Tickets", "Disputes", "Grade Master (view)"],
     PROCUREMENT: ["Procurement workbench", "Sellers", "Offers", "Catalog", "Grade Master"],
     FINANCE: ["Payments", "Receivables", "Credit Management", "Grade Master (view)"],
     COMPLIANCE: ["KYC", "Documents", "Disputes", "Grade Master (view)"],

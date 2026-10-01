@@ -14,10 +14,14 @@ type ApiEnvelope<T> = {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  details?: unknown;
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.details = details;
   }
 }
 
@@ -44,15 +48,19 @@ export async function apiRequest<T>(
   });
   const payload = (await response.json().catch(() => null)) as
     | ApiEnvelope<T>
-    | { message?: string }
+    | { message?: string | string[]; code?: string; details?: unknown }
     | null;
 
   if (!response.ok) {
-    const message =
-      payload && "message" in payload && payload.message
-        ? payload.message
-        : `Request failed (${response.status})`;
-    throw new ApiError(message, response.status);
+    const error = (payload ?? {}) as {
+      message?: string | string[];
+      code?: string;
+      details?: unknown;
+    };
+    const message = Array.isArray(error.message)
+      ? error.message.join(". ")
+      : error.message || `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, error.code, error.details);
   }
 
   const envelope = payload as ApiEnvelope<T>;

@@ -798,33 +798,72 @@ function mapSupportPriority(priority?: string): import("@/types").SupportTicket[
   }
 }
 
+const SUPPORT_STATUS_CODES: import("@/types").SupportTicketStatusCode[] = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_CUSTOMER",
+  "RESOLVED",
+  "CLOSED",
+];
+
+function toSupportStatusCode(value: unknown): import("@/types").SupportTicketStatusCode {
+  const code = String(value ?? "OPEN") as import("@/types").SupportTicketStatusCode;
+  return SUPPORT_STATUS_CODES.includes(code) ? code : "OPEN";
+}
+
+const SUPPORT_SOURCES: import("@/types").AppSource[] = [
+  "Customer App",
+  "Customer Web",
+  "Seller App",
+  "Seller Web",
+];
+
 function mapSupportTicket(row: Record<string, unknown>): import("@/types").SupportTicket {
   const requesterType = String(row.requesterType ?? "CUSTOMER") === "SELLER" ? "Seller" : "Customer";
-  const source: import("@/types").AppSource =
-    requesterType === "Seller" ? "Seller Web" : "Customer Web";
+  const backendSource = String(row.source ?? "") as import("@/types").AppSource;
+  const source: import("@/types").AppSource = SUPPORT_SOURCES.includes(backendSource)
+    ? backendSource
+    : (`${requesterType} ${row.channel === "APP" ? "App" : "Web"}` as import("@/types").AppSource);
+  const statusCode = toSupportStatusCode(row.status);
   const messages = Array.isArray(row.messages) ? row.messages : [];
+  const optional = (value: unknown) => (value == null || value === "" ? null : String(value));
   return {
     id: String(row.id),
     ticketNumber: String(row.ticketNumber ?? row.ticketId ?? row.id),
     requesterType,
     requesterName: String(row.requesterName ?? "—"),
+    requesterEmail: optional(row.requesterEmail),
+    requesterPhone: optional(row.requesterPhone),
     organizationName: String(row.organizationName ?? "—"),
     category: String(row.categoryLabel ?? row.category ?? "Other"),
     subject: String(row.subject ?? ""),
     description: String(row.description ?? ""),
+    relatedOrderId: optional(row.relatedOrderId),
+    attachmentName: optional(row.attachmentName),
     priority: mapSupportPriority(String(row.priority ?? "MEDIUM")),
-    status: mapSupportStatus(String(row.status ?? "OPEN")),
+    status: mapSupportStatus(statusCode),
+    statusCode,
+    allowedTransitions: Array.isArray(row.allowedTransitions)
+      ? row.allowedTransitions.map(toSupportStatusCode)
+      : [],
+    awaitingSupport:
+      row.lastMessageSender === "REQUESTER" && statusCode !== "RESOLVED" && statusCode !== "CLOSED",
+    resolutionNote: optional(row.resolutionNote),
+    resolvedAt: row.resolvedAt ? iso(row.resolvedAt) : null,
+    closedAt: row.closedAt ? iso(row.closedAt) : null,
     assignedTo: String(row.assignedToName ?? "Unassigned"),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
     source,
     messages: messages.map((m) => {
       const msg = m as Record<string, unknown>;
+      const sender = String(msg.sender ?? "SYSTEM");
       return {
         id: String(msg.id),
-        sender: String(msg.sender ?? ""),
+        sender: sender === "REQUESTER" || sender === "AGENT" ? sender : "SYSTEM",
         senderName: String(msg.senderName ?? ""),
         body: String(msg.body ?? ""),
+        attachmentName: optional(msg.attachmentName),
         createdAt: iso(msg.createdAt),
       };
     }),
@@ -838,14 +877,14 @@ export async function listAdminSupportTickets() {
 
 export async function updateAdminSupportTicketStatus(
   id: string,
-  status: "OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED",
+  status: import("@/types").SupportTicketStatusCode,
   note?: string,
 ) {
   const { data } = await apiRequest<Record<string, unknown>>(
     `/admin/support/tickets/${id}/status`,
     {
       method: "PATCH",
-      body: JSON.stringify({ status, note }),
+      body: JSON.stringify({ status, ...(note?.trim() ? { note: note.trim() } : {}) }),
     },
   );
   return mapSupportTicket(data as Record<string, unknown>);

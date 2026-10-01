@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
 
 export default function SellersPage() {
+  const router = useRouter();
   const rows = useDataStore((s) => s.sellers);
   const updateSeller = useDataStore((s) => s.updateSeller);
   const pushAudit = useDataStore((s) => s.pushAudit);
@@ -93,9 +95,14 @@ export default function SellersPage() {
           </dl>
         )}
         drawerFooter={(r) => (
-          <Button variant="destructive" className="w-full" onClick={() => setDeactivateId(r.id)}>
-            Deactivate seller
-          </Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" variant="outline" onClick={() => router.push(`/sellers/${r.id}`)}>
+              Seller 360
+            </Button>
+            <Button className="flex-1" variant="destructive" onClick={() => setDeactivateId(r.id)}>
+              Deactivate
+            </Button>
+          </div>
         )}
       />
       <ConfirmDialog
