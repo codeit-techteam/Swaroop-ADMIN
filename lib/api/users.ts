@@ -40,6 +40,7 @@ export type PermissionDef = {
   code: string;
   module: string;
   action: string;
+  description?: string;
 };
 
 export type PermissionPreset = {
@@ -48,8 +49,18 @@ export type PermissionPreset = {
   permissions: string[];
 };
 
+export type PermissionCatalog = {
+  role: string;
+  permissions: PermissionDef[];
+  presets: PermissionPreset[];
+  defaultPreset?: string;
+  assignableSellerStatuses: string[];
+  invitationTtlHours: number;
+};
+
 export type SellerOption = {
   id: string;
+  code?: string | null;
   name: string;
   legalName?: string | null;
   gst?: string | null;
@@ -59,21 +70,34 @@ export type SellerOption = {
 
 export type ManagerDetail = DirectoryUser & {
   mustChangePassword?: boolean;
+  hasPassword?: boolean;
   permissions: string[];
   loginCount: number | null;
+  seller: (SellerOption & { organizationStatus?: string }) | null;
+  createdBy: { id: string; name: string } | null;
+  pendingLink: { purpose: string; expiresAt: string; createdAt: string } | null;
   assignment: {
     id: string;
     status: string;
     isPrimary: boolean;
     title: string | null;
     assignedAt: string;
+    deactivatedAt?: string | null;
   } | null;
   activity: Array<{
     id: string;
     action: string;
     createdAt: string;
+    actorName?: string | null;
     metadata?: unknown;
   }>;
+};
+
+export type OneTimeLink = {
+  token: string;
+  expiresAt: string;
+  delivery: "MANUAL";
+  message: string;
 };
 
 export type CreatedManager = {
@@ -86,15 +110,15 @@ export type CreatedManager = {
   status: string;
   seller: SellerOption;
   permissions: string[];
-  accessMethod: string;
-  invitation: {
-    token: string;
-    expiresAt: string;
-    email: string;
-    message: string;
-  } | null;
-  temporaryPassword?: string;
+  isPrimary: boolean;
+  accessMethod: "INVITATION" | "TEMPORARY_PASSWORD";
+  invitation: (OneTimeLink & { email: string }) | null;
 };
+
+export function sellerSetupUrl(token: string) {
+  const origin = process.env.NEXT_PUBLIC_SELLER_APP_URL ?? "http://localhost:3003";
+  return `${origin.replace(/\/$/, "")}/accept-invite?token=${encodeURIComponent(token)}`;
+}
 
 function queryString(query: UserListQuery) {
   const params = new URLSearchParams();
@@ -120,29 +144,33 @@ export async function getUser(id: string) {
 }
 
 export async function getPermissionCatalog() {
-  return apiRequest<{
-    permissions: PermissionDef[];
-    presets: PermissionPreset[];
-  }>("/admin/users/permission-catalog");
+  return apiRequest<PermissionCatalog>("/admin/users/permission-catalog");
 }
 
-export async function searchSellers(search: string) {
-  const params = new URLSearchParams({ limit: "8", page: "1" });
+/** Server-side search, limited to sellers that can receive a manager. */
+export async function searchSellers(
+  search: string,
+  status = "APPROVED",
+  signal?: AbortSignal,
+): Promise<SellerOption[]> {
+  const params = new URLSearchParams({ limit: "10", page: "1", status });
   if (search.trim()) params.set("search", search.trim());
   const result = await apiRequest<
     Array<{
       id: string;
       status?: string;
       organization?: {
+        code?: string | null;
         name?: string;
         legalName?: string | null;
         gstin?: string | null;
         pan?: string | null;
       };
     }>
-  >(`/admin/sellers?${params.toString()}`);
+  >(`/admin/sellers?${params.toString()}`, { signal });
   return result.data.map((row) => ({
     id: row.id,
+    code: row.organization?.code ?? null,
     name: row.organization?.name ?? "Seller",
     legalName: row.organization?.legalName,
     gst: row.organization?.gstin,
@@ -179,8 +207,15 @@ export async function updateManager(
   });
 }
 
+export async function resetManagerAccess(id: string) {
+  return apiRequest<OneTimeLink & { purpose: "INVITATION" | "PASSWORD_RESET" }>(
+    `/admin/users/${id}/reset-password`,
+    { method: "POST" },
+  );
+}
+
 export async function postUserAction(id: string, action: string) {
-  return apiRequest<ManagerDetail & { token?: string; message?: string }>(
+  return apiRequest<ManagerDetail>(
     `/admin/users/${id}/${action}`,
     { method: "POST" },
   );

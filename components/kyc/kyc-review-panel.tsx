@@ -5,6 +5,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/documents/document-preview";
+import { KycActivityTimeline } from "@/components/kyc/kyc-activity-timeline";
+import { KycDocumentHistory } from "@/components/kyc/kyc-document-history";
+import { KycVerificationSection } from "@/components/kyc/kyc-verification-section";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -110,7 +113,7 @@ export function KycReviewPanel({
           value={[current.contact, current.phone, current.email].filter(Boolean).join(" · ") || "—"}
         />
         <DetailRow label="GSTIN" value={current.gst || "—"} />
-        <DetailRow label="PAN" value={current.pan || "—"} />
+        <DetailRow label="PAN" value={<span className="font-mono">{current.pan || "—"}</span>} />
         <DetailRow label="Bank" value={current.bank || "—"} />
         {detail.address ? <DetailRow label="Address" value={detail.address} /> : null}
         <DetailRow
@@ -119,6 +122,8 @@ export function KycReviewPanel({
         />
         {current.reviewedAt ? <DetailRow label="Last review" value={formatDateTime(current.reviewedAt)} /> : null}
       </dl>
+
+      <KycVerificationSection detail={detail} />
 
       <section>
         <div className="mb-2 flex items-center justify-between">
@@ -225,6 +230,13 @@ export function KycReviewPanel({
         ) : null}
       </section>
 
+      {record.entityId ? (
+        <KycDocumentHistory
+          record={{ entityType: record.entityType, entityId: record.entityId }}
+          history={detail.documentHistory}
+        />
+      ) : null}
+
       {active ? (
         <section>
           <h3 className="mb-2 text-sm font-semibold text-slate-900">
@@ -237,6 +249,13 @@ export function KycReviewPanel({
           No documents uploaded yet. They appear here as soon as the {record.entityType.toLowerCase()} uploads them
           from the {record.entityType} App or Web.
         </p>
+      ) : null}
+
+      {record.entityId ? (
+        <KycActivityTimeline
+          record={{ entityType: record.entityType, entityId: record.entityId }}
+          refreshKey={detail}
+        />
       ) : null}
     </div>
   );

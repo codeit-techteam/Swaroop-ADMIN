@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -18,12 +17,24 @@ import { ApiError } from "@/lib/api/client";
 import {
   createManager,
   getPermissionCatalog,
-  searchSellers,
   type CreatedManager,
-  type PermissionDef,
-  type PermissionPreset,
+  type PermissionCatalog,
   type SellerOption,
 } from "@/lib/api/users";
+
+import {
+  OneTimeLinkPanel,
+  PermissionGrid,
+  PermissionSummary,
+  SellerPicker,
+  SellerSummary,
+  TextField,
+  humanize,
+  validateEmail,
+  validateMobile,
+  validateName,
+  validatePassword,
+} from "./manager-fields";
 
 const STEPS = [
   "Personal Details",
@@ -32,6 +43,21 @@ const STEPS = [
   "Login Access",
   "Review",
 ];
+
+type FieldErrors = Partial<
+  Record<"name" | "email" | "phone" | "seller" | "permissions" | "password", string>
+>;
+
+/** Backend error codes mapped to the step and field that can fix them. */
+const ERROR_TARGETS: Record<string, { step: number; field: keyof FieldErrors }> = {
+  EMAIL_ALREADY_EXISTS: { step: 0, field: "email" },
+  MOBILE_ALREADY_EXISTS: { step: 0, field: "phone" },
+  INVALID_MOBILE: { step: 0, field: "phone" },
+  SELLER_NOT_FOUND: { step: 1, field: "seller" },
+  SELLER_NOT_ACTIVE: { step: 1, field: "seller" },
+  INVALID_PERMISSIONS: { step: 2, field: "permissions" },
+  WEAK_PASSWORD: { step: 3, field: "password" },
+};
 
 export function CreateManagerDrawer({
   open,
@@ -42,52 +68,41 @@ export function CreateManagerDrawer({
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [sellerQuery, setSellerQuery] = useState("");
-  const [sellers, setSellers] = useState<SellerOption[]>([]);
   const [seller, setSeller] = useState<SellerOption | null>(null);
-  const [catalog, setCatalog] = useState<PermissionDef[]>([]);
-  const [presets, setPresets] = useState<PermissionPreset[]>([]);
+  const [isPrimary, setIsPrimary] = useState(true);
+  const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [title, setTitle] = useState("");
-  const [accessMethod, setAccessMethod] = useState<"INVITATION" | "TEMPORARY_PASSWORD">("INVITATION");
+  const [accessMethod, setAccessMethod] = useState<"INVITATION" | "TEMPORARY_PASSWORD">(
+    "INVITATION",
+  );
   const [temporaryPassword, setTemporaryPassword] = useState("");
-  const [isPrimary, setIsPrimary] = useState(true);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [created, setCreated] = useState<CreatedManager | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || catalog) return;
+    setCatalogError(false);
     void getPermissionCatalog()
       .then((result) => {
-        setCatalog(result.data.permissions);
-        setPresets(result.data.presets);
+        setCatalog(result.data);
+        const preset = result.data.presets.find((p) => p.id === result.data.defaultPreset);
+        if (preset) {
+          setPermissions((current) => (current.length ? current : [...preset.permissions]));
+          setTitle((current) => current || preset.label);
+        }
       })
-      .catch(() => toast.error("Could not load permission catalog"));
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || step !== 1) return;
-    const handle = window.setTimeout(() => {
-      void searchSellers(sellerQuery)
-        .then(setSellers)
-        .catch(() => setSellers([]));
-    }, 250);
-    return () => window.clearTimeout(handle);
-  }, [open, sellerQuery, step]);
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, PermissionDef[]>();
-    for (const item of catalog) {
-      const list = map.get(item.module) ?? [];
-      list.push(item);
-      map.set(item.module, list);
-    }
-    return [...map.entries()];
-  }, [catalog]);
+      .catch(() => setCatalogError(true));
+  }, [open, catalog]);
 
   function reset() {
     setStep(0);
@@ -95,47 +110,93 @@ export function CreateManagerDrawer({
     setEmail("");
     setPhone("");
     setSeller(null);
-    setPermissions([]);
-    setCreated(null);
-    setTemporaryPassword("");
-    setAccessMethod("INVITATION");
     setIsPrimary(true);
+    setPermissions([]);
     setTitle("");
+    setAccessMethod("INVITATION");
+    setTemporaryPassword("");
+    setErrors({});
+    setSubmitError(null);
+    setCreated(null);
+    setCatalog(null);
   }
 
-  function toggle(code: string) {
-    setPermissions((current) =>
-      current.includes(code)
-        ? current.filter((item) => item !== code)
-        : [...current, code],
-    );
+  function validate(target: number): FieldErrors {
+    if (target === 0) {
+      const next: FieldErrors = {};
+      const nameError = validateName(name);
+      const emailError = validateEmail(email);
+      const phoneError = validateMobile(phone);
+      if (nameError) next.name = nameError;
+      if (emailError) next.email = emailError;
+      if (phoneError) next.phone = phoneError;
+      return next;
+    }
+    if (target === 1 && !seller) return { seller: "Select the seller this manager will operate" };
+    if (target === 2 && !permissions.length) {
+      return { permissions: "Select at least one permission" };
+    }
+    if (target === 3 && accessMethod === "TEMPORARY_PASSWORD") {
+      const passwordError = validatePassword(temporaryPassword);
+      if (passwordError) return { password: passwordError };
+    }
+    return {};
+  }
+
+  function next() {
+    const found = validate(step);
+    setErrors(found);
+    if (Object.keys(found).length) return;
+    setSubmitError(null);
+    setStep((value) => Math.min(value + 1, STEPS.length - 1));
   }
 
   async function submit() {
-    if (!seller) return;
+    if (submitting.current || !seller) return;
+    for (let index = 0; index < STEPS.length - 1; index += 1) {
+      const found = validate(index);
+      if (Object.keys(found).length) {
+        setErrors(found);
+        setStep(index);
+        return;
+      }
+    }
+    submitting.current = true;
     setBusy(true);
+    setSubmitError(null);
     try {
       const result = await createManager({
-        name: name.trim(),
-        email: email.trim(),
+        name: name.trim().replace(/\s+/g, " "),
+        email: email.trim().toLowerCase(),
         phone: phone.trim(),
         sellerId: seller.id,
         role: "SELLER_MANAGER",
         permissions,
         accessMethod,
-        temporaryPassword:
-          accessMethod === "TEMPORARY_PASSWORD" ? temporaryPassword : undefined,
+        temporaryPassword: accessMethod === "TEMPORARY_PASSWORD" ? temporaryPassword : undefined,
         isPrimary,
-        title: title || undefined,
+        title: title.trim() || undefined,
       });
+      setTemporaryPassword("");
       setCreated(result.data);
       onCreated();
-      toast.success("Seller Manager created");
+      toast.success("Seller Manager created successfully");
     } catch (error) {
-      toast.error(
-        error instanceof ApiError ? error.message : "Could not create manager",
-      );
+      const apiError = error instanceof ApiError ? error : null;
+      const target = apiError?.code ? ERROR_TARGETS[apiError.code] : undefined;
+      const message =
+        apiError?.status === 403
+          ? "You do not have permission to create Seller Managers."
+          : apiError?.message ?? "Could not create the Seller Manager. Try again.";
+      if (target) {
+        setErrors({ [target.field]: message });
+        setStep(target.step);
+      } else {
+        setSubmitError(message);
+      }
+      toast.error(message);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -144,6 +205,7 @@ export function CreateManagerDrawer({
     <Sheet
       open={open}
       onOpenChange={(next) => {
+        if (busy) return;
         onOpenChange(next);
         if (!next) reset();
       }}
@@ -156,7 +218,19 @@ export function CreateManagerDrawer({
           </SheetDescription>
         </SheetHeader>
         {created ? (
-          <CreatedPanel created={created} />
+          <CreatedPanel
+            created={created}
+            catalog={catalog}
+            onView={() => {
+              onOpenChange(false);
+              reset();
+              router.push(`/users/${created.id}`);
+            }}
+            onClose={() => {
+              onOpenChange(false);
+              reset();
+            }}
+          />
         ) : (
           <div className="mt-6 space-y-5">
             <ol className="flex flex-wrap gap-2 text-xs">
@@ -166,150 +240,202 @@ export function CreateManagerDrawer({
                   className={
                     index === step
                       ? "rounded-full bg-slate-900 px-2 py-1 text-white"
-                      : "rounded-full bg-slate-100 px-2 py-1 text-slate-600"
+                      : index < step
+                        ? "rounded-full bg-slate-200 px-2 py-1 text-slate-700"
+                        : "rounded-full bg-slate-100 px-2 py-1 text-slate-500"
                   }
                 >
                   {index + 1}. {label}
                 </li>
               ))}
             </ol>
+
             {step === 0 ? (
               <div className="space-y-3">
-                <Field label="Full name" value={name} onChange={setName} />
-                <Field label="Email" value={email} onChange={setEmail} type="email" />
-                <Field label="Mobile number" value={phone} onChange={setPhone} />
+                <TextField
+                  label="Full name"
+                  value={name}
+                  onChange={setName}
+                  error={errors.name}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                  error={errors.email}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Mobile number"
+                  value={phone}
+                  onChange={setPhone}
+                  error={errors.phone}
+                  placeholder="10-digit Indian mobile"
+                  autoComplete="off"
+                />
               </div>
             ) : null}
+
             {step === 1 ? (
               <div className="space-y-3">
-                <Field label="Search seller" value={sellerQuery} onChange={setSellerQuery} placeholder="Search seller..." />
-                <ul className="max-h-56 space-y-1 overflow-auto">
-                  {sellers.map((option) => (
-                    <li key={option.id}>
-                      <button
-                        type="button"
-                        className={`w-full rounded-md border px-3 py-2 text-left text-sm ${seller?.id === option.id ? "border-slate-900 bg-slate-50" : "border-slate-200"}`}
-                        onClick={() => setSeller(option)}
-                      >
-                        <span className="font-medium">{option.name}</span>
-                        <span className="block text-xs text-slate-500">
-                          {option.gst || "GST —"} · {option.pan || "PAN —"} · {option.status}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {seller ? (
-                  <div className="rounded-md border bg-slate-50 p-3 text-sm">
-                    <p className="font-medium">{seller.name}</p>
-                    <p>Seller ID: {seller.id}</p>
-                    <p>GST: {seller.gst || "—"}</p>
-                    <p>PAN: {seller.pan || "—"}</p>
-                    <p>Status: {seller.status}</p>
-                  </div>
-                ) : null}
+                <SellerPicker
+                  value={seller}
+                  onChange={(option) => {
+                    setSeller(option);
+                    setErrors({});
+                  }}
+                />
+                {errors.seller ? <p className="text-xs text-red-600">{errors.seller}</p> : null}
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={isPrimary} onCheckedChange={(value) => setIsPrimary(value === true)} />
+                  <Checkbox
+                    checked={isPrimary}
+                    onCheckedChange={(value) => setIsPrimary(value === true)}
+                  />
                   Set as primary account manager
                 </label>
               </div>
             ) : null}
+
             {step === 2 ? (
               <div className="space-y-3">
                 <p className="text-sm text-slate-600">Role: Seller Manager</p>
-                <div className="flex flex-wrap gap-2">
-                  {presets.map((preset) => (
-                    <Button
-                      key={preset.id}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setPermissions(preset.permissions);
-                        setTitle(preset.label);
-                      }}
-                    >
-                      {preset.label}
+                <TextField
+                  label="Title"
+                  value={title}
+                  onChange={setTitle}
+                  placeholder="e.g. Operations Manager"
+                />
+                {catalogError ? (
+                  <div className="space-y-2 text-sm text-red-600">
+                    <p>Could not load the permission catalog.</p>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setCatalog(null)}>
+                      Retry
                     </Button>
-                  ))}
-                </div>
-                {grouped.map(([module, items]) => (
-                  <div key={module} className="rounded-md border p-3">
-                    <p className="text-sm font-medium">{module}</p>
-                    <div className="mt-2 flex flex-wrap gap-3">
-                      {items.map((item) => (
-                        <label key={item.code} className="flex items-center gap-2 text-xs">
-                          <Checkbox
-                            checked={permissions.includes(item.code)}
-                            onCheckedChange={() => toggle(item.code)}
-                          />
-                          {item.action}
-                        </label>
-                      ))}
-                    </div>
                   </div>
-                ))}
+                ) : (
+                  <PermissionGrid
+                    catalog={catalog?.permissions ?? []}
+                    presets={catalog?.presets ?? []}
+                    value={permissions}
+                    onChange={(codes) => {
+                      setPermissions(codes);
+                      setErrors({});
+                    }}
+                    onPreset={(preset) => setTitle(preset.label)}
+                  />
+                )}
+                {errors.permissions ? (
+                  <p className="text-xs text-red-600">{errors.permissions}</p>
+                ) : null}
               </div>
             ) : null}
+
             {step === 3 ? (
               <div className="space-y-3 text-sm">
-                <label className="flex items-center gap-2">
+                <label className="flex items-start gap-2">
                   <input
                     type="radio"
+                    className="mt-1"
                     checked={accessMethod === "INVITATION"}
                     onChange={() => setAccessMethod("INVITATION")}
                   />
-                  Send a one-time password setup link
+                  <span>
+                    <span className="font-medium">Invitation link (recommended)</span>
+                    <span className="block text-xs text-slate-500">
+                      A one-time setup link valid for {catalog?.invitationTtlHours ?? 72} hours. The
+                      manager sets their own password, then signs in to the Seller panel.
+                    </span>
+                  </span>
                 </label>
-                <label className="flex items-center gap-2">
+                <label className="flex items-start gap-2">
                   <input
                     type="radio"
+                    className="mt-1"
                     checked={accessMethod === "TEMPORARY_PASSWORD"}
                     onChange={() => setAccessMethod("TEMPORARY_PASSWORD")}
                   />
-                  Set a temporary password (shown once, change required)
+                  <span>
+                    <span className="font-medium">Temporary password</span>
+                    <span className="block text-xs text-slate-500">
+                      You set it now and share it securely. The manager must change it at first
+                      sign-in. It is stored only as a hash and never shown again.
+                    </span>
+                  </span>
                 </label>
                 {accessMethod === "TEMPORARY_PASSWORD" ? (
-                  <Field
+                  <TextField
                     label="Temporary password"
+                    type="password"
                     value={temporaryPassword}
                     onChange={setTemporaryPassword}
-                    type="password"
+                    error={errors.password}
+                    autoComplete="new-password"
+                    hint="8+ characters with uppercase, lowercase, and a number."
                   />
-                ) : (
-                  <p className="text-slate-500">
-                    The setup token is shown once after creation. Passwords are never emailed.
-                  </p>
-                )}
+                ) : null}
               </div>
             ) : null}
+
             {step === 4 ? (
               <dl className="space-y-2 text-sm">
-                <Row label="Name" value={name} />
-                <Row label="Email" value={email} />
-                <Row label="Phone" value={phone} />
-                <Row label="Seller" value={seller?.name} />
+                <Row label="Full name" value={name.trim()} />
+                <Row label="Email" value={email.trim().toLowerCase()} />
+                <Row label="Mobile" value={phone.trim()} />
                 <Row label="Role" value="Seller Manager" />
                 <Row label="Title" value={title || "Seller Manager"} />
-                <Row label="Permissions" value={`${permissions.length} selected`} />
-                <Row label="Login method" value={accessMethod === "INVITATION" ? "Invitation" : "Temporary password"} />
+                <div>
+                  <dt className="mb-1 text-slate-500">Assigned seller</dt>
+                  <dd>{seller ? <SellerSummary seller={seller} /> : "—"}</dd>
+                </div>
+                <Row label="Primary manager" value={isPrimary ? "Yes" : "No"} />
+                <div>
+                  <dt className="mb-1 text-slate-500">Permissions ({permissions.length})</dt>
+                  <dd className="text-xs">
+                    <PermissionSummary catalog={catalog?.permissions ?? []} codes={permissions} />
+                  </dd>
+                </div>
+                <Row
+                  label="Login access"
+                  value={
+                    accessMethod === "INVITATION"
+                      ? "Invitation required"
+                      : "Temporary password (change required)"
+                  }
+                />
+                <Row
+                  label="Account status after creation"
+                  value={accessMethod === "INVITATION" ? "Pending until invitation is accepted" : "Active"}
+                />
               </dl>
             ) : null}
+
+            {submitError ? (
+              <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                {submitError}
+              </p>
+            ) : null}
+
             <div className="flex justify-between">
-              <Button type="button" variant="outline" disabled={step === 0} onClick={() => setStep((value) => value - 1)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={step === 0 || busy}
+                onClick={() => {
+                  setErrors({});
+                  setStep((value) => value - 1);
+                }}
+              >
                 Back
               </Button>
-              {step < 4 ? (
-                <Button
-                  type="button"
-                  disabled={!canContinue(step, { name, email, phone, seller, permissions, accessMethod, temporaryPassword })}
-                  onClick={() => setStep((value) => value + 1)}
-                >
+              {step < STEPS.length - 1 ? (
+                <Button type="button" onClick={next}>
                   Continue
                 </Button>
               ) : (
                 <Button type="button" disabled={busy} onClick={() => void submit()}>
-                  {busy ? "Creating…" : "Create Manager"}
+                  {busy ? "Creating Seller Manager…" : "Create Seller Manager"}
                 </Button>
               )}
             </div>
@@ -320,80 +446,64 @@ export function CreateManagerDrawer({
   );
 }
 
-function CreatedPanel({ created }: { created: CreatedManager }) {
-  const sellerOrigin =
-    process.env.NEXT_PUBLIC_SELLER_APP_URL ?? "http://localhost:3003";
-  const setupUrl = created.invitation
-    ? `${sellerOrigin}/accept-invite?token=${created.invitation.token}`
-    : "";
-  return (
-    <div className="mt-6 space-y-3 text-sm">
-      <p className="text-base font-semibold">Manager created successfully</p>
-      <Row label="Name" value={created.name} />
-      <Row label="Login ID" value={created.loginId} />
-      <Row label="Seller" value={created.seller.name} />
-      <Row label="Role" value="Seller Manager" />
-      <Row label="Status" value={created.status} />
-      {created.invitation ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p>Invitation prepared for {created.invitation.email}.</p>
-          <p className="mt-2 break-all font-mono text-xs">{setupUrl}</p>
-          <p className="mt-2 text-xs">{created.invitation.message}</p>
-          <Button
-            className="mt-2"
-            size="sm"
-            variant="outline"
-            type="button"
-            onClick={() => void navigator.clipboard.writeText(setupUrl)}
-          >
-            Copy setup link
-          </Button>
-        </div>
-      ) : null}
-      {created.temporaryPassword ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p>Temporary password: {created.temporaryPassword}</p>
-          <p className="mt-1 text-xs">This password will not be shown again.</p>
-          <Button
-            className="mt-2"
-            size="sm"
-            variant="outline"
-            type="button"
-            onClick={() => void navigator.clipboard.writeText(created.temporaryPassword ?? "")}
-          >
-            Copy temporary password
-          </Button>
-        </div>
-      ) : null}
-      <Button
-        size="sm"
-        variant="outline"
-        type="button"
-        onClick={() => void navigator.clipboard.writeText(created.loginId ?? "")}
-      >
-        Copy Login ID
-      </Button>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
+function CreatedPanel({
+  created,
+  catalog,
+  onView,
+  onClose,
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
+  created: CreatedManager;
+  catalog: PermissionCatalog | null;
+  onView: () => void;
+  onClose: () => void;
 }) {
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
-      <Input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    <div className="mt-6 space-y-3 text-sm">
+      <p className="text-base font-semibold">Seller Manager created successfully.</p>
+      <dl className="space-y-2">
+        <Row label="Name" value={created.name} />
+        <Row label="Email" value={created.email} />
+        <Row label="Login ID" value={created.loginId} />
+        <Row label="Assigned seller" value={created.seller.name} />
+        <Row label="Role" value="Seller Manager" />
+        <Row label="Account status" value={humanize(created.status)} />
+        <div>
+          <dt className="mb-1 text-slate-500">Permissions</dt>
+          <dd className="text-xs">
+            <PermissionSummary catalog={catalog?.permissions ?? []} codes={created.permissions} />
+          </dd>
+        </div>
+      </dl>
+      {created.invitation ? (
+        <OneTimeLinkPanel
+          link={created.invitation}
+          title={`Invitation prepared for ${created.invitation.email} (not sent automatically)`}
+        />
+      ) : (
+        <p className="rounded-md border bg-slate-50 p-3 text-xs text-slate-600">
+          The manager signs in with Login ID {created.loginId} and the temporary password you set,
+          and must change it at first sign-in. Share it through a secure channel.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" onClick={onView}>
+          View manager
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            void navigator.clipboard
+              .writeText(created.loginId ?? "")
+              .then(() => toast.success("Login ID copied"))
+          }
+        >
+          Copy Login ID
+        </Button>
+        <Button type="button" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
     </div>
   );
 }
@@ -405,27 +515,4 @@ function Row({ label, value }: { label: string; value?: string | null }) {
       <dd className="text-right font-medium">{value || "—"}</dd>
     </div>
   );
-}
-
-function canContinue(
-  step: number,
-  values: {
-    name: string;
-    email: string;
-    phone: string;
-    seller: SellerOption | null;
-    permissions: string[];
-    accessMethod: string;
-    temporaryPassword: string;
-  },
-) {
-  if (step === 0) {
-    return values.name.trim().length > 1 && values.email.includes("@") && values.phone.replace(/\D/g, "").length >= 10;
-  }
-  if (step === 1) return Boolean(values.seller);
-  if (step === 2) return values.permissions.length > 0;
-  if (step === 3 && values.accessMethod === "TEMPORARY_PASSWORD") {
-    return values.temporaryPassword.length >= 8;
-  }
-  return true;
 }

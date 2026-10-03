@@ -125,6 +125,8 @@ export default function KycPage() {
       await refresh();
     } catch (error) {
       toast.error(errorMessage(error, failure));
+      // Another reviewer may have acted first; show the current state.
+      void refresh().catch(() => undefined);
       throw error;
     }
   };
@@ -140,7 +142,15 @@ export default function KycPage() {
   const audience = selected?.entityType === "Customer" ? "customer" : "seller";
   const approved = selected?.status === "Approved";
   const blockers = detail?.blockers ?? [];
+  const warnings = detail?.warnings ?? [];
   const pendingDocs = detail?.record.documentsPending ?? 0;
+  const approveBlockedReason = (r: KycRecord): string | undefined => {
+    if (!detail || approved) return undefined;
+    if (r.entityType === "Customer" && r.status !== "Under Review") {
+      return "Only KYC submitted for review can be approved.";
+    }
+    return blockers.length ? `Blocked: ${blockers.join(", ")}` : undefined;
+  };
 
   return (
     <>
@@ -249,8 +259,8 @@ export default function KycPage() {
           <div className="grid grid-cols-3 gap-2">
             <Button
               size="sm"
-              disabled={!detail || approved || blockers.length > 0}
-              title={blockers.length ? `Blocked: ${blockers.join(", ")}` : undefined}
+              disabled={!detail || approved || Boolean(approveBlockedReason(r))}
+              title={approveBlockedReason(r)}
               onClick={() => setDialog({ kind: "approve" })}
             >
               {approved ? "Approved" : "Approve"}
@@ -281,11 +291,14 @@ export default function KycPage() {
             open={dialog?.kind === "approve"}
             onOpenChange={(open) => !open && setDialog(null)}
             title={`Approve ${selected.entity}?`}
-            description={
+            description={[
               pendingDocs
                 ? `${pendingDocs} document(s) still pending review will be marked Verified and the ${audience} is notified.`
-                : `All documents are verified. The ${audience} is notified that KYC is approved.`
-            }
+                : `All documents are verified. The ${audience} is notified that KYC is approved.`,
+              ...(warnings.length
+                ? [`Please confirm before approving: ${warnings.join(" ")}`]
+                : []),
+            ].join(" ")}
             confirmLabel="Approve KYC"
             required={false}
             placeholder="Internal notes (optional)"

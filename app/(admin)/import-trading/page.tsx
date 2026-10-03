@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -18,7 +19,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ErrorState, KpiSkeleton } from "@/components/shared/states";
-import { getImportDashboard } from "@/lib/api/import-trading";
+import { getImportDashboard, IMPORT_SHIPMENT_STATUSES } from "@/lib/api/import-trading";
 
 const STATUS_ORDER = [
   "DRAFT",
@@ -53,6 +54,18 @@ export default function ImportTradingDashboardPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Total buy requests"
+              value={String(data.totalBuyRequests)}
+              hint="Published or later; drafts excluded"
+              href={`${IMPORT_BASE}/listings?side=BUY`}
+            />
+            <KpiCard
+              label="Total sell offers"
+              value={String(data.totalSellOffers)}
+              hint="Published or later; drafts excluded"
+              href={`${IMPORT_BASE}/listings?side=SELL`}
+            />
             <KpiCard
               label="Active buy requests"
               value={String(data.activeBuyRequests)}
@@ -98,14 +111,12 @@ export default function ImportTradingDashboardPage() {
             />
             <KpiCard
               label="Cancelled listings"
-              value={String(
-                (data.listingsBySideAndStatus.BUY.CANCELLED ?? 0) + (data.listingsBySideAndStatus.SELL.CANCELLED ?? 0),
-              )}
+              value={String(data.cancelledListings)}
               href={`${IMPORT_BASE}/listings?status=CANCELLED`}
             />
             <KpiCard
               label="Cancelled deals"
-              value={String(data.dealsByStatus.CANCELLED ?? 0)}
+              value={String(data.dealsCancelled)}
               href={`${IMPORT_BASE}/deals?status=CANCELLED`}
             />
             <KpiCard
@@ -113,6 +124,54 @@ export default function ImportTradingDashboardPage() {
               value={String(data.agreedNegotiations)}
               href={`${IMPORT_BASE}/negotiations?status=AGREED`}
             />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:col-span-2">
+              <KpiCard
+                label="Shipments booked"
+                value={String(data.shipmentsBooked)}
+                hint="Booked, not yet shipped"
+                href={`${IMPORT_BASE}/shipments?status=BOOKED`}
+              />
+              <KpiCard
+                label="In transit"
+                value={String(data.shipmentsInTransit)}
+                hint="Shipped through out for delivery"
+                href={`${IMPORT_BASE}/shipments`}
+              />
+              <KpiCard
+                label="Delivered"
+                value={String(data.shipmentsDelivered)}
+                tone="success"
+                href={`${IMPORT_BASE}/shipments?status=DELIVERED`}
+              />
+              <KpiCard
+                label="Shipment exceptions"
+                value={String(data.shipmentExceptions)}
+                tone={data.shipmentExceptions ? "danger" : "default"}
+                href={`${IMPORT_BASE}/shipments?exceptionsOnly=true`}
+              />
+            </div>
+            <Section title="Shipments by status">
+              {IMPORT_SHIPMENT_STATUSES.some((s) => data.shipmentsByStatus[s]) ? (
+                <ul className="space-y-1.5 text-sm">
+                  {IMPORT_SHIPMENT_STATUSES.filter((s) => data.shipmentsByStatus[s]).map((s) => (
+                    <li key={s}>
+                      <Link
+                        href={`${IMPORT_BASE}/shipments?status=${s}`}
+                        className="flex items-center justify-between rounded px-1 py-0.5 hover:bg-slate-50"
+                      >
+                        <ImportBadge value={s} kind="shipment" />
+                        <span className="font-medium">{data.shipmentsByStatus[s]}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No shipments booked yet.</p>
+              )}
+            </Section>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">

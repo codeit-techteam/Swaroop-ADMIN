@@ -1,5 +1,7 @@
 /** Wire types for `/api/v1/import/*`. Decimals travel as strings. */
 
+import type { AdminAuditEntry } from "@/lib/api/import-trading";
+
 export type ImportSide = "BUY" | "SELL";
 export type ImportParty = "BUYER" | "SELLER";
 
@@ -324,6 +326,118 @@ export type ImportDeal = {
   confirmedAt: string | null;
   cancelledAt: string | null;
   createdAt: string;
+};
+
+export type ImportShipmentStatus =
+  | "BOOKED"
+  | "SHIPPED"
+  | "IN_TRANSIT"
+  | "ARRIVED"
+  | "CUSTOMS_CLEARANCE"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "EXCEPTION"
+  | "CANCELLED";
+
+export type ImportShipmentMode = "SEA" | "AIR" | "ROAD" | "RAIL" | "MULTIMODAL";
+
+export type ImportShipmentEvent = {
+  id: string;
+  status: ImportShipmentStatus;
+  /** null = note/location update without a status change. */
+  previousStatus: ImportShipmentStatus | null;
+  location: string | null;
+  description: string | null;
+  occurredAt: string;
+  actorParty: "BUYER" | "SELLER" | "ADMIN" | "SYSTEM";
+  source: string;
+  actorUserId?: string | null;
+  metadata?: unknown;
+};
+
+export type AdminImportShipment = {
+  id: string;
+  referenceNumber: string;
+  status: ImportShipmentStatus;
+  mode: ImportShipmentMode;
+  myParty: "BUYER" | "SELLER" | "ADMIN";
+  canManage: boolean;
+  allowedTransitions?: ImportShipmentStatus[];
+  deal: {
+    id: string;
+    referenceNumber: string;
+    status: ImportDealStatus;
+    quantity: string;
+    quantityUnit: ImportQuantityUnit;
+    product: string | null;
+  };
+  buyerRef: string;
+  sellerRef: string;
+  buyer?: { id: string; name: string };
+  seller?: { id: string; name: string };
+  createdById?: string | null;
+  updatedById?: string | null;
+  quantity: string;
+  quantityUnit: ImportQuantityUnit;
+  carrierName: string | null;
+  trackingNumber: string | null;
+  vesselName: string | null;
+  voyageNumber: string | null;
+  containerNumbers: string[];
+  originLocation: string | null;
+  destinationLocation: string | null;
+  etd: string | null;
+  /** null means unknown; never substitute an estimate. */
+  eta: string | null;
+  departedAt: string | null;
+  arrivedAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  exceptionReason: string | null;
+  remarks: string | null;
+  version: number;
+  events: ImportShipmentEvent[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminImportShipmentDetail = AdminImportShipment & { auditTrail: AdminAuditEntry[] };
+
+export type AdminImportShipmentsQuery = {
+  status?: ImportShipmentStatus;
+  exceptionsOnly?: "true";
+  dealId?: string;
+  buyerOrgId?: string;
+  sellerOrgId?: string;
+  mode?: ImportShipmentMode;
+  createdFrom?: string;
+  createdTo?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type ImportShipmentDetailsInput = {
+  mode?: ImportShipmentMode;
+  carrierName?: string | null;
+  trackingNumber?: string | null;
+  vesselName?: string | null;
+  voyageNumber?: string | null;
+  containerNumbers?: string[];
+  originLocation?: string | null;
+  destinationLocation?: string | null;
+  etd?: string | null;
+  eta?: string | null;
+  remarks?: string | null;
+};
+
+export type ImportShipmentUpdateInput = ImportShipmentDetailsInput & { version: number };
+
+export type ImportShipmentEventInput = {
+  status?: ImportShipmentStatus;
+  location?: string | null;
+  description?: string | null;
+  occurredAt?: string;
 };
 
 export type ImportDocument = {

@@ -1,6 +1,10 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  AdminKycAuditEvent,
   AdminKycDetail,
+  AdminKycDocumentHistory,
+  AdminKycVerification,
+  AdminKycVerificationStatus,
   AdminSellerReview,
   AppSource,
   Customer,
@@ -371,7 +375,7 @@ export function mapAdminKycRow(row: Record<string, unknown>): KycRecord {
     reviewer: row.reviewedAt ? "Compliance" : "—",
     reviewedAt: optionalString(row.reviewedAt),
     gst: String(org.gstin ?? ""),
-    pan: String(org.pan ?? ""),
+    pan: maskIdentifier(optionalString(org.pan)),
     bank: bankLabel,
     notes: String(row.reviewNotes ?? ""),
     rejectedReason: optionalString(row.rejectedReason),
@@ -391,17 +395,109 @@ function kycPath(record: Pick<KycRecord, "entityType" | "entityId">) {
   return `/admin/kyc/${type}/${record.entityId}`;
 }
 
+const VERIFICATION_STATUS: Record<string, AdminKycVerificationStatus> = {
+  VERIFYING: "Verifying",
+  VERIFIED: "Verified",
+  FAILED: "Failed",
+  MANUAL_REVIEW: "Manual Review",
+};
+
+function mapVerification(value: unknown): AdminKycVerification | null {
+  const raw = asRecord(value);
+  if (!raw.id) return null;
+  const details: Record<string, string> = {};
+  for (const [key, detail] of Object.entries(asRecord(raw.details))) {
+    if (typeof detail === "string" && detail.trim()) details[key] = detail;
+  }
+  return {
+    id: String(raw.id),
+    type: raw.type === "GST" ? "GST" : "PAN",
+    status: VERIFICATION_STATUS[String(raw.status)] ?? "Verifying",
+    method: raw.method === "PROVIDER" ? "Provider" : raw.method === "MANUAL" ? "Manual" : null,
+    identifierMasked: String(raw.identifierMasked ?? ""),
+    provider: String(raw.provider ?? ""),
+    details,
+    failureCode: optionalString(raw.failureCode),
+    message: String(raw.message ?? ""),
+    verifiedAt: optionalString(raw.verifiedAt),
+    reviewedAt: optionalString(raw.reviewedAt),
+    createdAt: iso(raw.createdAt),
+  };
+}
+
+function mapDocumentHistory(value: unknown): AdminKycDocumentHistory[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    const group = asRecord(entry);
+    const versions = Array.isArray(group.versions) ? group.versions : [];
+    return {
+      slot: String(group.slot ?? ""),
+      name: String(group.name ?? group.slot ?? "Document"),
+      versions: versions.map((item) => {
+        const version = asRecord(item);
+        const size = Number(version.fileSizeBytes);
+        return {
+          id: String(version.id),
+          version: num(version.version) || 1,
+          status: String(version.status ?? ""),
+          fileName: String(version.fileName ?? "Document"),
+          mimeType: optionalString(version.mimeType),
+          fileSizeBytes: Number.isFinite(size) && size > 0 ? size : null,
+          rejectionReason: optionalString(version.rejectionReason),
+          source: mapUploadSource(version.uploadSource),
+          uploadedAt: iso(version.uploadedAt),
+          current: Boolean(version.current),
+        };
+      }),
+    };
+  });
+}
+
+/** Shows the first two and last three characters, e.g. AB•••••34F. */
+export function maskIdentifier(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (raw.length <= 5) return "•".repeat(raw.length);
+  const head = raw.length > 10 ? 4 : 2;
+  const tail = raw.length > 10 ? 4 : 3;
+  return `${raw.slice(0, head)}${"•".repeat(raw.length - head - tail)}${raw.slice(-tail)}`;
+}
+
 export async function getAdminKycDetail(
   record: Pick<KycRecord, "entityType" | "entityId">,
 ): Promise<AdminKycDetail> {
   const { data } = await apiRequest<Record<string, unknown>>(kycPath(record));
   const details = asRecord(data.details);
   const slots = Array.isArray(data.slots) ? (data.slots as Record<string, unknown>[]) : [];
+  const business = data.business ? asRecord(data.business) : null;
+  const verifications = data.verifications ? asRecord(data.verifications) : null;
   return {
     record: mapAdminKycRow(data),
     blockers: Array.isArray(data.blockers) ? data.blockers.map(String) : [],
+    warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [],
     legalName: optionalString(details.legalName),
     address: optionalString(details.address),
+    business: business
+      ? {
+          name: optionalString(business.name),
+          legalName: optionalString(business.legalName),
+          tradeName: optionalString(business.tradeName),
+          businessType: optionalString(business.businessType),
+          constitution: optionalString(business.constitution),
+          address: optionalString(business.address),
+          state: optionalString(business.state),
+          pincode: optionalString(business.pincode),
+        }
+      : null,
+    verifications: verifications
+      ? {
+          pan: mapVerification(verifications.pan),
+          gst: mapVerification(verifications.gst),
+          history: Array.isArray(verifications.history)
+            ? verifications.history.flatMap((row) => mapVerification(row) ?? [])
+            : [],
+        }
+      : null,
+    documentHistory: mapDocumentHistory(data.documentHistory),
     slots: slots.map((slot) => {
       const doc = asRecord(slot.document);
       const size = Number(doc.fileSizeBytes);
@@ -448,6 +544,44 @@ export async function rejectAdminKyc(
     method: "POST",
     body: JSON.stringify({ reason }),
   });
+}
+
+export async function getAdminKycAudit(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+): Promise<AdminKycAuditEvent[]> {
+  const { data } = await apiRequest<Record<string, unknown>[]>(`${kycPath(record)}/audit`);
+  return (data ?? []).map((row) => {
+    const actor = asRecord(row.actor);
+    const details: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(asRecord(row.details))) {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        details[key] = value;
+      }
+    }
+    return {
+      id: String(row.id),
+      action: String(row.action ?? ""),
+      actor: {
+        id: optionalString(actor.id),
+        name: optionalString(actor.name),
+        role: String(actor.role ?? "ADMIN"),
+      },
+      details,
+      createdAt: iso(row.createdAt),
+    };
+  });
+}
+
+/** Short-lived signed URL for any KYC file version, including replaced ones. */
+export async function downloadAdminKycVersion(
+  record: Pick<KycRecord, "entityType" | "entityId">,
+  documentId: string,
+  disposition: "inline" | "attachment" = "attachment",
+) {
+  const { data } = await apiRequest<{ url: string; fileName?: string; mimeType?: string | null }>(
+    `${kycPath(record)}/documents/${documentId}/download?disposition=${disposition}`,
+  );
+  return data;
 }
 
 export async function requestAdminKycChanges(

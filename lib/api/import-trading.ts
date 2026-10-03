@@ -1,5 +1,8 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  AdminImportShipment,
+  AdminImportShipmentDetail,
+  AdminImportShipmentsQuery,
   ImportCriterionEvidence,
   ImportDeal,
   ImportDealStatus,
@@ -7,11 +10,34 @@ import type {
   ImportListingStatus,
   ImportNegotiationStatus,
   ImportQuantityUnit,
+  ImportShipmentEventInput,
+  ImportShipmentMode,
+  ImportShipmentStatus,
+  ImportShipmentUpdateInput,
   ImportSide,
 } from "@/types/import-trading";
 
 export type PageMeta = { page: number; limit: number; total: number; totalPages: number };
 export type PagedResult<T> = { items: T[]; meta?: PageMeta };
+
+export type ShipmentPageMeta = PageMeta & {
+  /** Platform-wide, independent of the active filters. */
+  countsByStatus: Partial<Record<ImportShipmentStatus, number>>;
+};
+
+export const IMPORT_SHIPMENT_STATUSES: ImportShipmentStatus[] = [
+  "BOOKED",
+  "SHIPPED",
+  "IN_TRANSIT",
+  "ARRIVED",
+  "CUSTOMS_CLEARANCE",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "EXCEPTION",
+  "CANCELLED",
+];
+
+export const IMPORT_SHIPMENT_MODES: ImportShipmentMode[] = ["SEA", "AIR", "ROAD", "RAIL", "MULTIMODAL"];
 
 type Query = Record<string, string | number | undefined | null>;
 
@@ -82,6 +108,7 @@ export type AdminDealDetail = AdminDeal & {
     agreedAt: string | null;
   };
   timeline: Array<Omit<AdminNegotiationEvent, "actorUserId">>;
+  shipments: AdminImportShipment[];
   documents: AdminImportDocument[];
   auditTrail: AdminAuditEntry[];
 };
@@ -214,6 +241,17 @@ export type ImportDashboard = {
   dealsByStatus: Record<string, number>;
   topProducts: Array<{ categoryId: string | null; name: string | null; activeListings: number }>;
   recentListings: AdminListing[];
+  /** Published-or-later BUY listings (drafts excluded). */
+  totalBuyRequests: number;
+  totalSellOffers: number;
+  cancelledListings: number;
+  dealsCancelled: number;
+  shipmentsBooked: number;
+  /** SHIPPED through OUT_FOR_DELIVERY. */
+  shipmentsInTransit: number;
+  shipmentsDelivered: number;
+  shipmentExceptions: number;
+  shipmentsByStatus: Partial<Record<ImportShipmentStatus, number>>;
 };
 
 export type ImportSettings = {
@@ -222,6 +260,7 @@ export type ImportSettings = {
   allowCustomGrade: boolean;
   nearExpiryHours: number;
   negotiationTtlHours: number;
+  buyRequestValidityDays: number;
   notificationChannels: string[];
   updatedAt: string | null;
   updatedById: string | null;
@@ -231,7 +270,12 @@ export type ImportSettings = {
 export type ImportSettingsInput = Partial<
   Pick<
     ImportSettings,
-    "matchWeights" | "minMatchScore" | "allowCustomGrade" | "nearExpiryHours" | "negotiationTtlHours"
+    | "matchWeights"
+    | "minMatchScore"
+    | "allowCustomGrade"
+    | "nearExpiryHours"
+    | "negotiationTtlHours"
+    | "buyRequestValidityDays"
   >
 >;
 
@@ -326,6 +370,24 @@ export const setImportDealStatus = (
   status: Extract<ImportDealStatus, "CANCELLED" | "PARTIALLY_FULFILLED" | "FULFILLED">,
   reason?: string,
 ) => post<AdminDealDetail>(`/admin/import/deals/${id}/status`, { status, reason });
+
+// Shipments --------------------------------------------------------------------
+
+export async function listShipments(
+  params: AdminImportShipmentsQuery,
+): Promise<{ items: AdminImportShipment[]; meta?: ShipmentPageMeta }> {
+  const { data, meta } = await apiRequest<AdminImportShipment[]>(`/admin/import/shipments${qs(params)}`);
+  return { items: data ?? [], meta: meta as ShipmentPageMeta | undefined };
+}
+
+export const getShipment = (id: string) =>
+  get<AdminImportShipmentDetail>(`/admin/import/shipments/${id}`);
+
+export const updateShipment = (id: string, body: ImportShipmentUpdateInput) =>
+  post<AdminImportShipmentDetail>(`/admin/import/shipments/${id}`, body, "PATCH");
+
+export const addShipmentEvent = (id: string, body: ImportShipmentEventInput) =>
+  post<AdminImportShipmentDetail>(`/admin/import/shipments/${id}/events`, body);
 
 // Documents & audit ------------------------------------------------------------
 

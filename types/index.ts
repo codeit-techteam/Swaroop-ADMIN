@@ -313,12 +313,76 @@ export interface AdminKycSlot {
   document: AdminKycDocument | null;
 }
 
+export type AdminKycVerificationStatus = "Verifying" | "Verified" | "Failed" | "Manual Review";
+
+export interface AdminKycVerification {
+  id: string;
+  type: "PAN" | "GST";
+  status: AdminKycVerificationStatus;
+  method: "Provider" | "Manual" | null;
+  identifierMasked: string;
+  provider: string;
+  details: Record<string, string>;
+  failureCode: string | null;
+  message: string;
+  verifiedAt: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminKycDocumentVersion {
+  id: string;
+  version: number;
+  status: string;
+  fileName: string;
+  mimeType: string | null;
+  fileSizeBytes: number | null;
+  rejectionReason: string | null;
+  source: AppSource | null;
+  uploadedAt: string;
+  current: boolean;
+}
+
+export interface AdminKycDocumentHistory {
+  slot: string;
+  name: string;
+  versions: AdminKycDocumentVersion[];
+}
+
+export interface AdminKycBusiness {
+  name: string | null;
+  legalName: string | null;
+  tradeName: string | null;
+  businessType: string | null;
+  constitution: string | null;
+  address: string | null;
+  state: string | null;
+  pincode: string | null;
+}
+
+export interface AdminKycAuditEvent {
+  id: string;
+  action: string;
+  actor: { id: string | null; name: string | null; role: string };
+  details: Record<string, string | number | boolean>;
+  createdAt: string;
+}
+
 export interface AdminKycDetail {
   record: KycRecord;
   slots: AdminKycSlot[];
   blockers: string[];
+  /** Non-blocking notes the reviewer should acknowledge before approving. */
+  warnings: string[];
   legalName: string | null;
   address: string | null;
+  business: AdminKycBusiness | null;
+  verifications: {
+    pan: AdminKycVerification | null;
+    gst: AdminKycVerification | null;
+    history: AdminKycVerification[];
+  } | null;
+  documentHistory: AdminKycDocumentHistory[];
 }
 
 export type ProcurementStatus =

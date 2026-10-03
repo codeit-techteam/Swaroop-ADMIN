@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/client";
 import { exportUsers, listUsers, type DirectoryUser } from "@/lib/api/users";
 import { formatDateTime } from "@/lib/format";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLES = ["", "SUPER_ADMIN", "ADMIN", "SELLER_MANAGER", "SELLER", "CUSTOMER"];
 const STATUSES = ["", "ACTIVE", "INACTIVE", "SUSPENDED", "INVITED", "REVOKED", "PENDING"];
 
@@ -50,7 +51,7 @@ export default function UsersPage() {
         search,
         role,
         status,
-        sellerId,
+        sellerId: UUID_PATTERN.test(sellerId.trim()) ? sellerId.trim() : undefined,
         from: from ? new Date(from).toISOString() : undefined,
         to: to ? new Date(`${to}T23:59:59`).toISOString() : undefined,
         sortBy: "createdAt",
@@ -72,7 +73,14 @@ export default function UsersPage() {
 
   async function onExport() {
     try {
-      const result = await exportUsers({ search, role, status, sellerId, from, to });
+      const result = await exportUsers({
+        search,
+        role,
+        status,
+        sellerId: UUID_PATTERN.test(sellerId.trim()) ? sellerId.trim() : undefined,
+        from: from ? new Date(from).toISOString() : undefined,
+        to: to ? new Date(`${to}T23:59:59`).toISOString() : undefined,
+      });
       const blob = new Blob([result.data.csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -95,14 +103,14 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => void onExport()}>
               Export
             </Button>
-            <Button onClick={() => setCreateOpen(true)}>+ Create Manager</Button>
+            <Button onClick={() => setCreateOpen(true)}>+ Create Seller Manager</Button>
           </>
         }
       />
       <div className="grid gap-2 md:grid-cols-6">
         <Input
           className="md:col-span-2"
-          placeholder="Search users"
+          placeholder="Search name, email, mobile, login ID, seller"
           value={search}
           onChange={(event) => {
             setPage(1);
@@ -111,7 +119,7 @@ export default function UsersPage() {
         />
         <Select value={role} onChange={(value) => { setPage(1); setRole(value); }} options={ROLES} placeholder="All roles" labels={ROLE_LABEL} />
         <Select value={status} onChange={(value) => { setPage(1); setStatus(value); }} options={STATUSES} placeholder="All statuses" />
-        <Input placeholder="Seller ID" value={sellerId} onChange={(event) => { setPage(1); setSellerId(event.target.value); }} />
+        <Input placeholder="Seller UUID (exact)" value={sellerId} onChange={(event) => { setPage(1); setSellerId(event.target.value); }} />
         <div className="flex gap-2">
           <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
           <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />

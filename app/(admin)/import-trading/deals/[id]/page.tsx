@@ -19,6 +19,7 @@ import {
   KeyValues,
   ReasonDialog,
   Section,
+  shipmentEta,
   useLoader,
 } from "@/components/import-trading/shared";
 import { PageHeader } from "@/components/shared/page-header";
@@ -61,7 +62,7 @@ function statusChangedAt(deal: AdminDealDetail, status: string) {
     .find(
       (a) =>
         a.entityId === deal.id &&
-        a.action === "IMPORT_DEAL_STATUS_CHANGED_BY_ADMIN" &&
+        (a.action === "IMPORT_DEAL_STATUS_CHANGED_BY_ADMIN" || a.action === "IMPORT_DEAL_FULFILMENT_CHANGED") &&
         (a.newData as { status?: string } | null)?.status === status,
     );
   return entry?.createdAt ?? null;
@@ -96,6 +97,94 @@ function DealLifecycle({ deal }: { deal: AdminDealDetail }) {
       {deal.cancelledAt ? (
         <p className="text-sm text-red-700">Cancelled {formatDateTime(deal.cancelledAt)}</p>
       ) : null}
+    </div>
+  );
+}
+
+/** Deal quantities have at most 3 decimals; summed in thousandths to avoid float drift. */
+const MILLI = BigInt(1000);
+const ZERO = BigInt(0);
+
+const toMilli = (value: string) => {
+  const [int = "0", frac = ""] = value.split(".");
+  return BigInt(int || "0") * MILLI + BigInt((frac + "000").slice(0, 3));
+};
+
+const fromMilli = (value: bigint) => `${value / MILLI}.${String(value % MILLI).padStart(3, "0")}`;
+
+function DealShipments({ deal }: { deal: AdminDealDetail }) {
+  const active = deal.shipments.filter((s) => s.status !== "CANCELLED");
+  const sum = (rows: AdminDealDetail["shipments"]) => rows.reduce((total, s) => total + toMilli(s.quantity), ZERO);
+  const booked = sum(active);
+  const delivered = sum(active.filter((s) => s.status === "DELIVERED"));
+  const remaining = toMilli(deal.quantity) - booked;
+
+  return (
+    <div className="space-y-3">
+      <dl className="grid gap-3 sm:grid-cols-4">
+        {[
+          { label: "Deal quantity", value: deal.quantity },
+          { label: "On shipments", value: fromMilli(booked) },
+          { label: "Delivered", value: fromMilli(delivered) },
+          { label: "Remaining to ship", value: fromMilli(remaining > ZERO ? remaining : ZERO) },
+        ].map((item) => (
+          <div key={item.label} className="rounded-md border border-slate-200 px-3 py-2">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{item.label}</dt>
+            <dd className="mt-0.5 text-sm font-medium text-slate-900">{formatQty(item.value, deal.quantityUnit)}</dd>
+          </div>
+        ))}
+      </dl>
+      {deal.shipments.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="py-1 pr-3 font-medium">Shipment</th>
+                <th className="py-1 pr-3 font-medium">Status</th>
+                <th className="py-1 pr-3 font-medium">Quantity</th>
+                <th className="py-1 pr-3 font-medium">Carrier / tracking</th>
+                <th className="py-1 pr-3 font-medium">ETA</th>
+                <th className="py-1 font-medium">Last event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deal.shipments.map((s) => {
+                const last = s.events[s.events.length - 1];
+                return (
+                  <tr key={s.id} className="border-t border-slate-100 align-top">
+                    <td className="py-1.5 pr-3">
+                      <Link className="text-primary hover:underline" href={`${IMPORT_BASE}/shipments/${s.id}`}>
+                        {s.referenceNumber}
+                      </Link>
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <ImportBadge value={s.status} kind="shipment" />
+                    </td>
+                    <td className="py-1.5 pr-3">{formatQty(s.quantity, s.quantityUnit)}</td>
+                    <td className="py-1.5 pr-3">
+                      {[s.carrierName, s.trackingNumber].filter(Boolean).join(" · ") || "—"}
+                    </td>
+                    <td className={cn("py-1.5 pr-3", !s.eta && "text-muted-foreground")}>{shipmentEta(s.eta)}</td>
+                    <td className="py-1.5 text-xs text-muted-foreground">
+                      {last
+                        ? `${last.previousStatus ? importLabel(last.status) : "Tracking note"}${
+                            last.location ? ` · ${last.location}` : ""
+                          } · ${formatDateTime(last.occurredAt)}`
+                        : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {deal.status === "CONFIRMED" || deal.status === "PARTIALLY_FULFILLED"
+            ? "No shipments booked yet. The seller books shipments once the deal is confirmed."
+            : "No shipments. Shipments can only be booked on confirmed deals."}
+        </p>
+      )}
     </div>
   );
 }
@@ -252,10 +341,11 @@ export default function ImportDealDetailPage() {
             <AuditTimeline entries={d.auditTrail} />
           </Section>
 
-          <Section title="Payment & shipment" className="xl:col-span-3">
-            <p className="text-sm text-muted-foreground">
-              Import deals do not yet carry payment or shipment records in the backend. Fulfilment is tracked through
-              the deal status above (partially fulfilled / fulfilled).
+          <Section title={`Shipments (${d.shipments.length})`} className="xl:col-span-3">
+            <DealShipments deal={d} />
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Shipments are booked and updated by the seller (or Admin). Delivered shipments move the deal to
+              partially fulfilled or fulfilled automatically. Payment records are not tracked for Import deals.
             </p>
           </Section>
         </div>

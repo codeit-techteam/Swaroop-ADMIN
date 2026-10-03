@@ -22,6 +22,7 @@ const ENTITY_TYPES = [
   { value: "IMPORT_LISTING", label: "Listings" },
   { value: "IMPORT_NEGOTIATION", label: "Negotiations" },
   { value: "IMPORT_DEAL", label: "Deals" },
+  { value: "IMPORT_SHIPMENT", label: "Shipments" },
   { value: "IMPORT_MASTER", label: "Master data & settings" },
 ];
 
@@ -53,6 +54,10 @@ const ACTIONS = [
   "IMPORT_DEAL_PARTY_CONFIRMED",
   "IMPORT_DEAL_CONFIRMED",
   "IMPORT_DEAL_STATUS_CHANGED_BY_ADMIN",
+  "IMPORT_DEAL_FULFILMENT_CHANGED",
+  "IMPORT_SHIPMENT_CREATED",
+  "IMPORT_SHIPMENT_UPDATED",
+  "IMPORT_SHIPMENT_STATUS_CHANGED",
   "IMPORT_MATCHES_RECOMPUTED",
   "IMPORT_MASTER_CREATED",
   "IMPORT_MASTER_UPDATED",
@@ -69,6 +74,8 @@ function entityHref(row: AdminImportAuditRow) {
       return `${IMPORT_BASE}/negotiations/${row.entityId}`;
     case "IMPORT_DEAL":
       return `${IMPORT_BASE}/deals/${row.entityId}`;
+    case "IMPORT_SHIPMENT":
+      return `${IMPORT_BASE}/shipments/${row.entityId}`;
     default:
       return null;
   }
@@ -80,7 +87,14 @@ function changeSummary(row: AdminImportAuditRow) {
   const next = row.newData as Record<string, unknown> | null;
   const meta = row.metadata ?? {};
   const parts: string[] = [];
-  if (prev?.status && next?.status) parts.push(`${importLabel(String(prev.status))} → ${importLabel(String(next.status))}`);
+  if (prev?.status && next?.status && prev.status !== next.status) {
+    parts.push(`${importLabel(String(prev.status))} → ${importLabel(String(next.status))}`);
+  }
+  if (row.action === "IMPORT_SHIPMENT_UPDATED" && next && !("status" in next)) {
+    const fields = Object.keys(next).map((k) => importLabel(k.replace(/([A-Z])/g, "_$1").toUpperCase()));
+    if (fields.length) parts.push(`Edited: ${fields.join(", ")}`);
+  }
+  if (typeof next?.location === "string" && next.location) parts.push(next.location);
   if (typeof next?.category === "string") parts.push(importLabel(next.category));
   if (typeof next?.fileName === "string") parts.push(next.fileName);
   if (typeof meta.category === "string" && !next?.category) parts.push(importLabel(meta.category));
@@ -137,7 +151,7 @@ function AuditView() {
       <CreditToolbar
         search={search}
         onSearch={reset(setSearch)}
-        searchPlaceholder="Search IBR / ISO / INE / IDL reference or action"
+        searchPlaceholder="Search IBR / ISO / INE / IDL / ISH reference or action"
         extra={
           <>
             <select

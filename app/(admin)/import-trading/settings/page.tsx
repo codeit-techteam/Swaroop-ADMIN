@@ -51,6 +51,7 @@ function SettingsForm({ settings, onSaved }: { settings: ImportSettings; onSaved
   const [minScore, setMinScore] = useState(String(settings.minMatchScore));
   const [nearExpiry, setNearExpiry] = useState(String(settings.nearExpiryHours));
   const [ttl, setTtl] = useState(String(settings.negotiationTtlHours));
+  const [buyValidity, setBuyValidity] = useState(String(settings.buyRequestValidityDays));
   const [allowCustomGrade, setAllowCustomGrade] = useState(settings.allowCustomGrade);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +64,9 @@ function SettingsForm({ settings, onSaved }: { settings: ImportSettings; onSaved
     ...(!INT.test(minScore) || Number(minScore) > 100 ? ["Minimum score (0–100)"] : []),
     ...(!INT.test(nearExpiry) || Number(nearExpiry) > 720 ? ["Near-expiry window (0–720 hours)"] : []),
     ...(!INT.test(ttl) || Number(ttl) < 1 || Number(ttl) > 2160 ? ["Negotiation expiry (1–2160 hours)"] : []),
+    ...(!INT.test(buyValidity) || Number(buyValidity) < 1 || Number(buyValidity) > 180
+      ? ["Buy request open period (1–180 days)"]
+      : []),
   ];
 
   const save = async () => {
@@ -73,6 +77,7 @@ function SettingsForm({ settings, onSaved }: { settings: ImportSettings; onSaved
         minMatchScore: Number(minScore),
         nearExpiryHours: Number(nearExpiry),
         negotiationTtlHours: Number(ttl),
+        buyRequestValidityDays: Number(buyValidity),
         allowCustomGrade,
       });
       toast.success("Import settings saved. New matches use the updated weights.");
@@ -133,6 +138,16 @@ function SettingsForm({ settings, onSaved }: { settings: ImportSettings; onSaved
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="s-ttl">Offer expiry (hours)</Label>
               {numberInput(ttl, setTtl, "s-ttl")}
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="s-buy-validity">Buy request open period (days)</Label>
+                {numberInput(buyValidity, setBuyValidity, "s-buy-validity")}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Customers no longer pick a validity date; buy requests close automatically this many days after
+                publishing.
+              </p>
             </div>
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="s-custom">Allow custom grade names</Label>

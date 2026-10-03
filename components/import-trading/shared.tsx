@@ -18,7 +18,8 @@ import { ApiError } from "@/lib/api/client";
 import { type AdminAuditEntry, getImportDocumentUrl } from "@/lib/api/import-trading";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ImportQuantityUnit } from "@/types/import-trading";
+import { useAuthStore } from "@/store/auth-store";
+import type { ImportQuantityUnit, ImportShipmentStatus } from "@/types/import-trading";
 import { toast } from "sonner";
 
 export const IMPORT_BASE = "/import-trading";
@@ -28,6 +29,7 @@ const TABS = [
   { href: `${IMPORT_BASE}/listings`, label: "Listings" },
   { href: `${IMPORT_BASE}/negotiations`, label: "Negotiations" },
   { href: `${IMPORT_BASE}/deals`, label: "Deals" },
+  { href: `${IMPORT_BASE}/shipments`, label: "Shipments" },
   { href: `${IMPORT_BASE}/matches`, label: "Matches" },
   { href: `${IMPORT_BASE}/documents`, label: "Documents" },
   { href: `${IMPORT_BASE}/audit`, label: "Audit log" },
@@ -127,6 +129,13 @@ const LABELS: Record<string, string> = {
   QUALITY: "Quality & documents",
   FT_20: "20 ft",
   FT_40: "40 ft",
+  BOOKED: "Shipment booked",
+  SHIPPED: "Shipped / picked up",
+  ARRIVED: "Arrived at destination port",
+  SEA: "Sea",
+  AIR: "Air",
+  ROAD: "Road",
+  RAIL: "Rail",
 };
 
 export function importLabel(value?: string | null): string {
@@ -169,12 +178,33 @@ const TONE: Record<string, string> = {
   SELL: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
-export function ImportBadge({ value, className }: { value: string; className?: string }) {
+/** Shipment statuses; CANCELLED is neutral here, unlike listings and deals. */
+const SHIPMENT_TONE: Record<string, string> = {
+  BOOKED: "bg-sky-50 text-sky-700 border-sky-200",
+  SHIPPED: "bg-blue-50 text-blue-700 border-blue-200",
+  IN_TRANSIT: "bg-blue-50 text-blue-700 border-blue-200",
+  ARRIVED: "bg-amber-50 text-amber-800 border-amber-200",
+  CUSTOMS_CLEARANCE: "bg-amber-50 text-amber-800 border-amber-200",
+  OUT_FOR_DELIVERY: "bg-amber-50 text-amber-800 border-amber-200",
+  DELIVERED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  EXCEPTION: "bg-red-50 text-red-700 border-red-200",
+  CANCELLED: "bg-slate-50 text-slate-600 border-slate-200",
+};
+
+export function ImportBadge({
+  value,
+  kind,
+  className,
+}: {
+  value: string;
+  kind?: "shipment";
+  className?: string;
+}) {
   return (
     <span
       className={cn(
         "inline-flex items-center whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium",
-        TONE[value] ?? "bg-slate-50 text-slate-600 border-slate-200",
+        (kind === "shipment" ? SHIPMENT_TONE[value] : TONE[value]) ?? "bg-slate-50 text-slate-600 border-slate-200",
         className,
       )}
     >
@@ -226,6 +256,24 @@ export function formatImportDate(value?: string | null) {
 
 export function portLabel(p?: { code: string; name: string } | null) {
   return p ? `${p.name} (${p.code})` : "—";
+}
+
+/** Import writes are ADMIN/SUPER_ADMIN only; other admin roles get a read-only console. */
+export function useImportWriteAccess() {
+  const role = useAuthStore((s) => s.user?.role);
+  return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+export const SHIPMENT_TERMINAL: readonly ImportShipmentStatus[] = ["DELIVERED", "CANCELLED"];
+
+/** ETA is never estimated client-side. */
+export function shipmentEta(eta?: string | null) {
+  return eta ? formatDateTime(eta) : "ETA not available yet";
+}
+
+export function shipmentRoute(s: { originLocation: string | null; destinationLocation: string | null }) {
+  if (!s.originLocation && !s.destinationLocation) return "—";
+  return `${s.originLocation ?? "—"} → ${s.destinationLocation ?? "—"}`;
 }
 
 export function Section({
