@@ -13,10 +13,11 @@ import {
 } from "@/components/ui/dialog";
 import { downloadCsv, downloadCsvText } from "@/lib/csv";
 import { gradeExportRows } from "@/lib/grade-utils";
+import { listAllGrades } from "@/lib/api/grades";
 import { exportProcurement } from "@/lib/api/procurement-workbench";
 import { audienceLabel, CATEGORY_LABELS, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/push-notification-utils";
 import { useDataStore } from "@/store/data-store";
-import { useGradeStore } from "@/store/grade-store";
+import { DEFAULT_GRADE_SORT, EMPTY_GRADE_FILTERS } from "@/types/grade";
 import { usePushNotificationStore } from "@/store/push-notification-store";
 import { useUiStore } from "@/store/ui-store";
 
@@ -104,7 +105,14 @@ export function QuickExport() {
         })),
       );
     } else if (key === "grades") {
-      downloadCsv("petrotrade-grades.csv", gradeExportRows(useGradeStore.getState().grades));
+      void listAllGrades(EMPTY_GRADE_FILTERS, DEFAULT_GRADE_SORT)
+        .then((grades) => {
+          downloadCsv("petrotrade-grades.csv", gradeExportRows(grades));
+          toast.success(`Exported ${grades.length} grades`);
+          setExportOpen(false);
+        })
+        .catch(() => toast.error("Grade export failed."));
+      return;
     } else if (key === "push") {
       downloadCsv(
         "petrotrade-push-notifications.csv",

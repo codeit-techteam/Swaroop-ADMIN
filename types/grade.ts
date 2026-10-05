@@ -23,13 +23,18 @@ export type GradeStatus = "ACTIVE" | "INACTIVE";
 
 export type GradeVisibilityFilter = "ALL" | "VISIBLE" | "HIDDEN";
 
+/** Sort keys accepted by GET /admin/grades (server-side sorting). */
 export type GradeSortKey =
   | "gradeCode"
   | "gradeName"
-  | "categoryName"
-  | "status"
+  | "gradeNo"
+  | "manufacturer"
+  | "gradeGroup"
+  | "sortOrder"
   | "createdAt"
   | "updatedAt";
+
+export type GradeYesNoFilter = "ALL" | "YES" | "NO";
 
 /** Category Master precursor — grades belong to a category, not a free-text string. */
 export interface GradeCategory {
@@ -78,6 +83,89 @@ export interface Grade {
   createdBy?: string;
   updatedBy?: string;
   usage: GradeUsage;
+  /** Source.One identity and price fields; null for manually created grades. */
+  gradeNo: string | null;
+  gradeGroup: string | null;
+  manufacturer: string | null;
+  fullGradeName: string | null;
+  inTodaysDelhiPriceList: boolean;
+  priceTodayRsKg: string | null;
+  producerPriceRsKg: string | null;
+  producerPriceType: string | null;
+  /** "SOURCE_ONE" for imported grades; their code and category are import-managed. */
+  source: string | null;
+  sourceReference: string | null;
+  version: number;
+  lastImportedAt: string | null;
+}
+
+export interface GradeStats {
+  total: number;
+  active: number;
+  inactive: number;
+  customerVisible: number;
+  sellerVisible: number;
+  inTodaysDelhiPriceList: number;
+  sourceOne: number;
+  categories: number;
+  manufacturers: number;
+  lastImport: {
+    id: string;
+    fileName: string;
+    completedAt: string | null;
+    insertedRows: number;
+    updatedRows: number;
+    totalRows: number;
+  } | null;
+}
+
+export interface GradeFacetOption {
+  name: string;
+  gradeCount: number;
+}
+
+export interface GradeFacets {
+  gradeGroups: GradeFacetOption[];
+  manufacturers: GradeFacetOption[];
+}
+
+export interface GradeImportSummary {
+  batchId: string | null;
+  dryRun: boolean;
+  fileName: string;
+  fileSha256: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  grades: number;
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  categoriesCreated: number;
+  gradeGroupsCreated: number;
+  notInFile: number;
+}
+
+export interface GradeImportBatch {
+  id: string;
+  source: string;
+  fileName: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  trigger: string;
+  totalRows: number;
+  validRows: number;
+  insertedRows: number;
+  updatedRows: number;
+  unchangedRows: number;
+  skippedRows: number;
+  duplicateRows: number;
+  categoriesCreated: number;
+  gradeGroupsCreated: number;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
 }
 
 export interface GradeInput {
@@ -98,10 +186,9 @@ export interface GradeFilters {
   status: GradeStatus | "ALL";
   customerVisible: GradeVisibilityFilter;
   sellerVisible: GradeVisibilityFilter;
-  createdFrom: string;
-  createdTo: string;
-  updatedFrom: string;
-  updatedTo: string;
+  gradeGroup: string | "ALL";
+  manufacturer: string | "ALL";
+  inTodaysDelhiPriceList: GradeYesNoFilter;
 }
 
 export interface GradePagination {
@@ -112,14 +199,6 @@ export interface GradePagination {
 export interface GradeSort {
   key: GradeSortKey;
   dir: "asc" | "desc";
-}
-
-export interface GradeKpis {
-  total: number;
-  active: number;
-  inactive: number;
-  customerVisible: number;
-  sellerVisible: number;
 }
 
 export interface GradeAuditEvent {
@@ -142,69 +221,15 @@ export type GradeBulkAction =
   | "SELLER_VISIBLE"
   | "SELLER_HIDDEN";
 
-export type GradeImportIssue =
-  | "DUPLICATE_CODE"
-  | "EXISTING_CODE"
-  | "MISSING_CODE"
-  | "MISSING_NAME"
-  | "MISSING_CATEGORY"
-  | "UNKNOWN_CATEGORY"
-  | "INVALID_STATUS"
-  | "INVALID_VISIBILITY"
-  | "INVALID_SORT_ORDER";
-
-export interface GradeImportRow {
-  rowNumber: number;
-  raw: Record<string, string>;
-  parsed?: GradeInput;
-  issues: GradeImportIssue[];
-  action: "CREATE" | "SKIP";
-}
-
-export interface GradeImportPreview {
-  rows: GradeImportRow[];
-  validCount: number;
-  invalidCount: number;
-  duplicateCount: number;
-}
-
-/**
- * Payload Customer / Seller apps may consume.
- * Seller identity is intentionally absent (blind marketplace).
- */
-export interface GradePublicPayload {
-  id: string;
-  gradeCode: string;
-  gradeName: string;
-  categoryId: string;
-  categoryName: string;
-  description?: string;
-  applications: string[];
-  sortOrder: number;
-}
-
-export interface GradeListQuery {
-  search?: string;
-  categoryId?: string;
-  status?: GradeStatus;
-  customerVisible?: boolean;
-  sellerVisible?: boolean;
-  sortBy?: GradeSortKey;
-  sortDir?: "asc" | "desc";
-  page?: number;
-  pageSize?: number;
-}
-
 export const EMPTY_GRADE_FILTERS: GradeFilters = {
   search: "",
   categoryId: "ALL",
   status: "ALL",
   customerVisible: "ALL",
   sellerVisible: "ALL",
-  createdFrom: "",
-  createdTo: "",
-  updatedFrom: "",
-  updatedTo: "",
+  gradeGroup: "ALL",
+  manufacturer: "ALL",
+  inTodaysDelhiPriceList: "ALL",
 };
 
 export const DEFAULT_GRADE_PAGINATION: GradePagination = {

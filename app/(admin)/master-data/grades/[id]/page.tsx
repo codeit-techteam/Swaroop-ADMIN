@@ -14,18 +14,18 @@ import { useGradeStore } from "@/store/grade-store";
 
 export default function GradeDetailPage() {
   const params = useParams<{ id: string }>();
-  const grades = useGradeStore((s) => s.grades);
+  const detail = useGradeStore((s) => s.detail);
   const auditEvents = useGradeStore((s) => s.auditEvents);
-  const loadStatus = useGradeStore((s) => s.loadStatus);
-  const fetchGrades = useGradeStore((s) => s.fetchGrades);
+  const detailStatus = useGradeStore((s) => s.detailStatus);
+  const loadGrade = useGradeStore((s) => s.loadGrade);
 
   useEffect(() => {
-    void fetchGrades();
-  }, [fetchGrades]);
+    void loadGrade(params.id);
+  }, [loadGrade, params.id]);
 
-  const grade = grades.find((item) => item.id === params.id || item.gradeCode === params.id);
+  const grade = detail?.id === params.id ? detail : null;
 
-  if (loadStatus === "loading" && !grade) return <GradeSkeleton />;
+  if ((detailStatus === "loading" || detailStatus === "idle") && !grade) return <GradeSkeleton />;
   if (!grade) {
     return (
       <GradeEmptyState

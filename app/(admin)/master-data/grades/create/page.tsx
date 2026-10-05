@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { GradeForm } from "@/components/grades/grade-form";
 import { PageHeader } from "@/components/shared/page-header";
-import { GradeServiceError } from "@/lib/api/grades";
+import { GradeServiceError, getCategories, getCategoryCache } from "@/lib/api/grades";
 import { GRADE_PERMISSIONS, hasGradePermission } from "@/lib/grade-permissions";
 import { useAuthStore } from "@/store/auth-store";
 import { useGradeStore } from "@/store/grade-store";
@@ -16,13 +16,16 @@ import type { GradeInput } from "@/types/grade";
 export default function CreateGradePage() {
   const router = useRouter();
   const role = useAuthStore((s) => s.user?.role);
-  const grades = useGradeStore((s) => s.grades);
-  const fetchGrades = useGradeStore((s) => s.fetchGrades);
   const addGrade = useGradeStore((s) => s.addGrade);
 
+  const [categoriesLoaded, setCategoriesLoaded] = useState(() => getCategoryCache().length > 0);
+
   useEffect(() => {
-    void fetchGrades();
-  }, [fetchGrades]);
+    if (categoriesLoaded) return;
+    getCategories()
+      .then(() => setCategoriesLoaded(true))
+      .catch(() => toast.error("Unable to load categories."));
+  }, [categoriesLoaded]);
 
   if (!hasGradePermission(role, GRADE_PERMISSIONS.create)) {
     return <p className="text-sm text-muted-foreground">You do not have permission to create grades.</p>;
@@ -57,7 +60,6 @@ export default function CreateGradePage() {
       <GradeForm
         variant="page"
         mode="create"
-        existingCodes={grades.map((item) => item.gradeCode)}
         onSave={handleSave}
       />
     </div>

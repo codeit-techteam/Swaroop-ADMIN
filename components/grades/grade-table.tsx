@@ -44,7 +44,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatDateTime } from "@/lib/format";
-import { usageCount } from "@/lib/grade-utils";
+import { formatRsKg, usageCount } from "@/lib/grade-utils";
 import { cn } from "@/lib/utils";
 import { useGradeStore } from "@/store/grade-store";
 import { GRADE_PAGE_SIZES, type Grade, type GradeSortKey } from "@/types/grade";
@@ -64,11 +64,24 @@ interface GradeTableProps {
   canDelete?: boolean;
 }
 
-const SORTABLE: Array<{ key: GradeSortKey; label: string }> = [
-  { key: "gradeCode", label: "Grade ID" },
-  { key: "gradeName", label: "Grade Name" },
-  { key: "categoryName", label: "Category" },
-];
+function SortHeader({
+  label,
+  sortKey,
+  onSort,
+}: {
+  label: string;
+  sortKey: GradeSortKey;
+  onSort: (key: GradeSortKey) => void;
+}) {
+  return (
+    <TableHead className="text-[11px] uppercase tracking-wide">
+      <button type="button" className="inline-flex items-center gap-1" onClick={() => onSort(sortKey)}>
+        {label}
+        <ArrowUpDown className="size-3" />
+      </button>
+    </TableHead>
+  );
+}
 
 export function GradeTable({
   rows,
@@ -116,30 +129,16 @@ export function GradeTable({
                     aria-label="Select all grades"
                   />
                 </TableHead>
-                {SORTABLE.map((column) => (
-                  <TableHead key={column.key} className="text-[11px] uppercase tracking-wide">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort(column.key)}>
-                      {column.label}
-                      <ArrowUpDown className="size-3" />
-                    </button>
-                  </TableHead>
-                ))}
-                <TableHead className="text-[11px] uppercase tracking-wide">Description</TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wide">Applications</TableHead>
+                <SortHeader label="Grade ID" sortKey="gradeCode" onSort={toggleSort} />
+                <SortHeader label="Grade Name" sortKey="gradeName" onSort={toggleSort} />
+                <TableHead className="text-[11px] uppercase tracking-wide">Category</TableHead>
+                <SortHeader label="Grade Group" sortKey="gradeGroup" onSort={toggleSort} />
+                <SortHeader label="Manufacturer" sortKey="manufacturer" onSort={toggleSort} />
+                <TableHead className="text-[11px] uppercase tracking-wide">Delhi Price (₹/kg)</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wide">Customer Visible</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wide">Seller Visible</TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wide">
-                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("status")}>
-                    Status
-                    <ArrowUpDown className="size-3" />
-                  </button>
-                </TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wide">
-                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleSort("updatedAt")}>
-                    Updated At
-                    <ArrowUpDown className="size-3" />
-                  </button>
-                </TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wide">Status</TableHead>
+                <SortHeader label="Updated At" sortKey="updatedAt" onSort={toggleSort} />
                 <TableHead className="text-[11px] uppercase tracking-wide">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -161,15 +160,17 @@ export function GradeTable({
                     </TableCell>
                     <TableCell>
                       <p className="font-mono text-xs font-semibold text-slate-900">{row.gradeCode}</p>
-                      <p className="text-[11px] text-muted-foreground">{row.id}</p>
+                      <p className="text-[11px] text-muted-foreground">{row.source ? "Source.One" : "Manual"}</p>
                     </TableCell>
-                    <TableCell className="font-medium text-slate-900">{row.gradeName}</TableCell>
+                    <TableCell className="max-w-[240px]">
+                      <p className="truncate font-medium text-slate-900">{row.gradeName}</p>
+                      {row.gradeNo ? <p className="text-[11px] text-muted-foreground">Grade No. {row.gradeNo}</p> : null}
+                    </TableCell>
                     <TableCell>{row.categoryName}</TableCell>
-                    <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">
-                      {row.description || "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[180px] text-xs text-muted-foreground">
-                      {row.applications.slice(0, 3).join(", ") || "—"}
+                    <TableCell className="max-w-[160px] truncate text-sm">{row.gradeGroup || "—"}</TableCell>
+                    <TableCell className="max-w-[180px] truncate text-sm">{row.manufacturer || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {row.inTodaysDelhiPriceList ? formatRsKg(row.priceTodayRsKg) : "—"}
                     </TableCell>
                     <TableCell>
                       <GradeVisibilityBadge visible={row.customerVisible} />
@@ -257,12 +258,16 @@ export function GradeTable({
                   <div>
                     <p className="font-mono text-xs font-semibold">{row.gradeCode}</p>
                     <p className="text-sm font-medium">{row.gradeName}</p>
-                    <p className="text-xs text-muted-foreground">{row.categoryName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {[row.categoryName, row.gradeGroup, row.manufacturer].filter(Boolean).join(" · ")}
+                    </p>
                   </div>
                 </div>
                 <GradeStatusBadge status={row.status} />
               </div>
-              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.description || "No description"}</p>
+              {row.inTodaysDelhiPriceList ? (
+                <p className="mt-2 text-xs">Delhi price today: {formatRsKg(row.priceTodayRsKg)}/kg</p>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-3 text-xs">
                 <span>
                   Customer: <GradeVisibilityBadge visible={row.customerVisible} compact />

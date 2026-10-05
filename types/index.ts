@@ -630,7 +630,6 @@ export type {
   Grade,
   GradeCategory,
   GradeInput,
-  GradePublicPayload,
   GradeStatus,
 } from "./grade";
 

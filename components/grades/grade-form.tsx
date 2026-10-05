@@ -57,6 +57,7 @@ export function GradeForm({
   const [saving, setSaving] = useState(false);
   const [codeLocked, setCodeLocked] = useState(mode === "edit");
   const [appDraft, setAppDraft] = useState("");
+  const imported = mode === "edit" && Boolean(grade?.source);
 
   useEffect(() => {
     if (variant === "drawer" && !open) return;
@@ -86,7 +87,7 @@ export function GradeForm({
   async function submit() {
     const normalized: GradeInput = {
       ...values,
-      gradeCode: normalizeGradeCode(values.gradeCode),
+      gradeCode: imported ? values.gradeCode : normalizeGradeCode(values.gradeCode),
       gradeName: values.gradeName.trim(),
       applications: values.applications,
     };
@@ -127,7 +128,11 @@ export function GradeForm({
             placeholder="HDPE_FILM"
             className="font-mono"
           />
-          {mode === "edit" ? (
+          {imported ? (
+            <p className="text-[11px] text-muted-foreground">
+              Managed by the Source.One import (code, category and grade group cannot be edited here).
+            </p>
+          ) : mode === "edit" ? (
             <button
               type="button"
               className="text-left text-[11px] font-medium text-primary"
@@ -141,7 +146,7 @@ export function GradeForm({
           {errors.gradeCode ? <p className="text-xs text-red-600">{errors.gradeCode}</p> : null}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="gradeName">Grade Name *</Label>
+          <Label htmlFor="gradeName">{imported ? "Display Name *" : "Grade Name *"}</Label>
           <Input
             id="gradeName"
             value={values.gradeName}
@@ -155,7 +160,11 @@ export function GradeForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label>Category *</Label>
-          <Select value={values.categoryId || undefined} onValueChange={(value) => patch({ categoryId: value })}>
+          <Select
+            value={values.categoryId || undefined}
+            disabled={imported}
+            onValueChange={(value) => patch({ categoryId: value })}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>

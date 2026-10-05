@@ -7,7 +7,7 @@ import { GradeVisibilityBadge } from "@/components/grades/grade-visibility-badge
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDateTime } from "@/lib/format";
-import { usageCount } from "@/lib/grade-utils";
+import { formatRsKg, usageCount } from "@/lib/grade-utils";
 import { GRADE_IMPACT_SURFACES, type Grade, type GradeAuditEvent } from "@/types/grade";
 
 interface GradeDetailsDrawerProps {
@@ -61,6 +61,27 @@ export function GradeDetailsContent({
           <DetailRow label="Grade Code" value={<span className="font-mono">{grade.gradeCode}</span>} />
           <DetailRow label="Grade Name" value={grade.gradeName} />
           <DetailRow label="Category" value={grade.categoryName} />
+          {grade.source ? (
+            <>
+              <DetailRow label="Grade Group" value={grade.gradeGroup || "—"} />
+              <DetailRow label="Grade No." value={grade.gradeNo || "—"} />
+              <DetailRow label="Manufacturer" value={grade.manufacturer || "—"} />
+              <DetailRow label="Full Grade Name" value={grade.fullGradeName || "—"} />
+              <DetailRow label="In Today's Delhi List" value={grade.inTodaysDelhiPriceList ? "Yes" : "No"} />
+              <DetailRow label="Price Today (₹/kg)" value={formatRsKg(grade.priceTodayRsKg)} />
+              <DetailRow
+                label="Producer Price (₹/kg)"
+                value={
+                  grade.producerPriceRsKg
+                    ? `${formatRsKg(grade.producerPriceRsKg)}${grade.producerPriceType ? ` · ${grade.producerPriceType}` : ""}`
+                    : "—"
+                }
+              />
+              <DetailRow label="Source" value={`${grade.source} · v${grade.version}`} />
+              <DetailRow label="Source Reference" value={grade.sourceReference || "—"} />
+              <DetailRow label="Last Imported" value={grade.lastImportedAt ? formatDateTime(grade.lastImportedAt) : "—"} />
+            </>
+          ) : null}
           <DetailRow label="Description" value={grade.description || "—"} />
           <DetailRow label="Applications" value={grade.applications.join(", ") || "—"} />
           <DetailRow label="Status" value={<GradeStatusBadge status={grade.status} />} />

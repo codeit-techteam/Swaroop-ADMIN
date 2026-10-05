@@ -21,23 +21,23 @@ export default function EditGradePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const role = useAuthStore((s) => s.user?.role);
-  const grades = useGradeStore((s) => s.grades);
-  const loadStatus = useGradeStore((s) => s.loadStatus);
-  const fetchGrades = useGradeStore((s) => s.fetchGrades);
+  const detail = useGradeStore((s) => s.detail);
+  const detailStatus = useGradeStore((s) => s.detailStatus);
+  const loadGrade = useGradeStore((s) => s.loadGrade);
   const updateGrade = useGradeStore((s) => s.updateGrade);
   const [pendingCodeChange, setPendingCodeChange] = useState<GradeInput | null>(null);
 
   useEffect(() => {
-    void fetchGrades();
-  }, [fetchGrades]);
+    void loadGrade(params.id);
+  }, [loadGrade, params.id]);
 
-  const grade = grades.find((item) => item.id === params.id || item.gradeCode === params.id);
+  const grade = detail?.id === params.id ? detail : null;
 
   if (!hasGradePermission(role, GRADE_PERMISSIONS.update)) {
     return <p className="text-sm text-muted-foreground">You do not have permission to edit grades.</p>;
   }
 
-  if (loadStatus === "loading" && !grade) return <GradeSkeleton />;
+  if ((detailStatus === "loading" || detailStatus === "idle") && !grade) return <GradeSkeleton />;
   if (!grade) {
     return (
       <GradeEmptyState
@@ -90,7 +90,6 @@ export default function EditGradePage() {
         variant="page"
         mode="edit"
         grade={grade}
-        existingCodes={grades.map((item) => item.gradeCode)}
         onSave={handleSave}
       />
       <ConfirmDialog

@@ -36,7 +36,8 @@ export async function apiRequest<T>(
 ): Promise<{ data: T; meta?: ApiEnvelope<T>["meta"] }> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body && !headers.has("Content-Type")) {
+  // FormData needs the browser-generated multipart boundary header.
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   const access = token();

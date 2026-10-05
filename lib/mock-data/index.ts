@@ -4,7 +4,6 @@ export { customers } from "./customers";
 export { sellers } from "./sellers";
 export { users } from "./users";
 export { products } from "./products";
-export { grades, GRADE_CATEGORIES } from "./grades";
 export { offers } from "./offers";
 export { orders } from "./orders";
 export { payments } from "./payments";

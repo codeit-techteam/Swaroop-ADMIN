@@ -1,10 +1,19 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { Check, ChevronsUpDown, RotateCcw, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -13,11 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getLiveCategories } from "@/lib/grade-utils";
+import { cn } from "@/lib/utils";
 import { useGradeStore } from "@/store/grade-store";
-import type { GradeStatus, GradeVisibilityFilter } from "@/types/grade";
+import type { GradeFacetOption, GradeStatus, GradeVisibilityFilter, GradeYesNoFilter } from "@/types/grade";
 
 export function GradeFilters() {
   const filters = useGradeStore((s) => s.filters);
+  const facets = useGradeStore((s) => s.facets);
   const setFilters = useGradeStore((s) => s.setFilters);
   const resetFilters = useGradeStore((s) => s.resetFilters);
   const [search, setSearch] = useState(filters.search);
@@ -29,7 +40,7 @@ export function GradeFilters() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (search !== filters.search) setFilters({ search });
-    }, 200);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [search, filters.search, setFilters]);
 
@@ -41,7 +52,7 @@ export function GradeFilters() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search grade, category, ID..."
+            placeholder="Search grade no., manufacturer, group, name, code..."
             className="pl-8"
           />
         </div>
@@ -98,48 +109,102 @@ export function GradeFilters() {
           </SelectContent>
         </Select>
       </div>
-      <div className="mt-2 flex flex-wrap items-end gap-2">
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Created from</p>
-          <Input
-            type="date"
-            value={filters.createdFrom}
-            onChange={(event) => setFilters({ createdFrom: event.target.value })}
-            className="w-[160px]"
-          />
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        <FacetCombobox
+          label="Grade Group"
+          allLabel="All Grade Groups"
+          value={filters.gradeGroup}
+          options={facets.gradeGroups}
+          onChange={(gradeGroup) => setFilters({ gradeGroup })}
+        />
+        <FacetCombobox
+          label="Manufacturer"
+          allLabel="All Manufacturers"
+          value={filters.manufacturer}
+          options={facets.manufacturers}
+          onChange={(manufacturer) => setFilters({ manufacturer })}
+        />
+        <Select
+          value={filters.inTodaysDelhiPriceList}
+          onValueChange={(value) => setFilters({ inTodaysDelhiPriceList: value as GradeYesNoFilter })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Delhi Price List" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Delhi Price List · All</SelectItem>
+            <SelectItem value="YES">In Today&apos;s Delhi List</SelectItem>
+            <SelectItem value="NO">Not in Delhi List</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center lg:col-start-6 lg:justify-end">
+          <Button type="button" size="sm" variant="outline" onClick={resetFilters}>
+            <RotateCcw className="size-3.5" />
+            Reset Filters
+          </Button>
         </div>
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Created to</p>
-          <Input
-            type="date"
-            value={filters.createdTo}
-            onChange={(event) => setFilters({ createdTo: event.target.value })}
-            className="w-[160px]"
-          />
-        </div>
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Updated from</p>
-          <Input
-            type="date"
-            value={filters.updatedFrom}
-            onChange={(event) => setFilters({ updatedFrom: event.target.value })}
-            className="w-[160px]"
-          />
-        </div>
-        <div>
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Updated to</p>
-          <Input
-            type="date"
-            value={filters.updatedTo}
-            onChange={(event) => setFilters({ updatedTo: event.target.value })}
-            className="w-[160px]"
-          />
-        </div>
-        <Button type="button" size="sm" variant="outline" onClick={resetFilters}>
-          <RotateCcw className="size-3.5" />
-          Reset Filters
-        </Button>
       </div>
     </section>
+  );
+}
+
+function FacetCombobox({
+  label,
+  allLabel,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  allLabel: string;
+  value: string;
+  options: GradeFacetOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const select = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={label}
+          className="h-9 w-full justify-between font-normal"
+        >
+          <span className={cn("truncate", value === "ALL" && "text-muted-foreground")}>
+            {value === "ALL" ? allLabel : value}
+          </span>
+          <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={`Search ${label.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>No {label.toLowerCase()} found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value={`__all__ ${allLabel}`} onSelect={() => select("ALL")}>
+                <Check className={cn("size-3.5", value === "ALL" ? "opacity-100" : "opacity-0")} />
+                {allLabel}
+              </CommandItem>
+              {options.map((option) => (
+                <CommandItem key={option.name} value={option.name} onSelect={() => select(option.name)}>
+                  <Check className={cn("size-3.5", value === option.name ? "opacity-100" : "opacity-0")} />
+                  <span className="flex-1 truncate">{option.name}</span>
+                  <span className="text-xs text-muted-foreground">{option.gradeCount}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
