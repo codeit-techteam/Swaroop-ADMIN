@@ -4,6 +4,7 @@ import type {
   AdminKycDetail,
   AdminKycDocumentHistory,
   AdminKycVerification,
+  AdminKycMetrics,
   AdminKycVerificationStatus,
   AdminSellerReview,
   AppSource,
@@ -349,6 +350,7 @@ export function mapAdminKycRow(row: Record<string, unknown>): KycRecord {
   const entityType = row.entityType === "CUSTOMER" ? "Customer" : "Seller";
   const kycStatus = ADMIN_KYC_STATUS[String(row.kycStatus ?? "")] ?? "Pending";
   const missing = Array.isArray(docs.missing) ? docs.missing.map(String) : [];
+  const verification = asRecord(row.verification);
   const bankLabel = bank.accountLast4
     ? [optionalString(bank.bankName), `A/c •••• ${String(bank.accountLast4)}`, optionalString(bank.ifsc)]
         .filter(Boolean)
@@ -384,6 +386,9 @@ export function mapAdminKycRow(row: Record<string, unknown>): KycRecord {
     phone: String(contact.phone ?? ""),
     email: String(contact.email ?? ""),
     entityStatus: String(row.entityStatus ?? ""),
+    panVerification: rowVerificationStatus(verification.pan),
+    gstVerification: rowVerificationStatus(verification.gst),
+    panGstMismatch: verification.mismatch === true,
     source:
       mapUploadSource(row.source) ??
       (entityType === "Seller" ? "Seller Web" : "Customer Web"),
@@ -402,6 +407,10 @@ const VERIFICATION_STATUS: Record<string, AdminKycVerificationStatus> = {
   MANUAL_REVIEW: "Manual Review",
 };
 
+function rowVerificationStatus(value: unknown): AdminKycVerificationStatus | "Not Started" {
+  return VERIFICATION_STATUS[String(value ?? "")] ?? "Not Started";
+}
+
 function mapVerification(value: unknown): AdminKycVerification | null {
   const raw = asRecord(value);
   if (!raw.id) return null;
@@ -416,6 +425,8 @@ function mapVerification(value: unknown): AdminKycVerification | null {
     method: raw.method === "PROVIDER" ? "Provider" : raw.method === "MANUAL" ? "Manual" : null,
     identifierMasked: String(raw.identifierMasked ?? ""),
     provider: String(raw.provider ?? ""),
+    providerReference: optionalString(raw.providerReference),
+    source: mapUploadSource(raw.source) ?? optionalString(raw.source),
     details,
     failureCode: optionalString(raw.failureCode),
     message: String(raw.message ?? ""),
@@ -495,6 +506,7 @@ export async function getAdminKycDetail(
           history: Array.isArray(verifications.history)
             ? verifications.history.flatMap((row) => mapVerification(row) ?? [])
             : [],
+          mismatch: verifications.mismatch === true,
         }
       : null,
     documentHistory: mapDocumentHistory(data.documentHistory),
@@ -853,6 +865,11 @@ export function mapAdminProcurement(row: Record<string, unknown>): Procurement {
 export async function listAdminKyc() {
   const rows = await listAll<Record<string, unknown>>("/admin/kyc");
   return rows.map(mapAdminKycRow);
+}
+
+export async function getAdminKycMetrics(): Promise<AdminKycMetrics> {
+  const { data } = await apiRequest<AdminKycMetrics>("/admin/kyc/metrics");
+  return data;
 }
 
 export async function listAdminProcurements() {

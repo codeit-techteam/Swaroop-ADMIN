@@ -282,6 +282,32 @@ export interface KycRecord {
   reviewedAt?: string | null;
   rejectedReason?: string | null;
   changeRequest?: KycChangeRequest | null;
+  /** Latest backend PAN / GSTIN verification for this entity. */
+  panVerification?: AdminKycVerificationStatus | "Not Started";
+  gstVerification?: AdminKycVerificationStatus | "Not Started";
+  /** GSTIN is registered to a different PAN than the verified one. */
+  panGstMismatch?: boolean;
+}
+
+export interface AdminKycVerificationCounts {
+  verified: number;
+  failed: number;
+  manualReview: number;
+  notStarted: number;
+}
+
+/** GET /admin/kyc/metrics — aggregates computed from the database. */
+export interface AdminKycMetrics {
+  totals: { customers: number; sellers: number };
+  status: Record<string, number>;
+  customers: Record<string, number>;
+  sellers: Record<string, number>;
+  pan: AdminKycVerificationCounts;
+  gst: AdminKycVerificationCounts;
+  mismatches: number;
+  documentsPending: number;
+  documentsMissing: number;
+  generatedAt: string;
 }
 
 export interface KycChangeRequest {
@@ -322,6 +348,10 @@ export interface AdminKycVerification {
   method: "Provider" | "Manual" | null;
   identifierMasked: string;
   provider: string;
+  /** Provider request reference, for support escalations with the provider. */
+  providerReference: string | null;
+  /** App that initiated the check, e.g. "Seller Web". */
+  source: string | null;
   details: Record<string, string>;
   failureCode: string | null;
   message: string;
@@ -381,6 +411,8 @@ export interface AdminKycDetail {
     pan: AdminKycVerification | null;
     gst: AdminKycVerification | null;
     history: AdminKycVerification[];
+    /** GSTIN is registered to a different PAN than the verified PAN. */
+    mismatch: boolean;
   } | null;
   documentHistory: AdminKycDocumentHistory[];
 }

@@ -14,6 +14,7 @@ import {
   approveAdminDocument,
   approveAdminKyc,
   getAdminKycDetail,
+  getAdminKycMetrics,
   listAdminKyc,
   rejectAdminDocument,
   rejectAdminKyc,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/api/ops";
 import { formatDateTime } from "@/lib/format";
 import { useDataStore } from "@/store/data-store";
-import type { AdminKycDetail, AdminKycDocument, KycRecord } from "@/types";
+import type { AdminKycDetail, AdminKycDocument, AdminKycMetrics, KycRecord } from "@/types";
 
 const REJECT_PRESETS = [
   "Documents do not match the registered business details.",
@@ -61,6 +62,7 @@ export default function KycPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [metrics, setMetrics] = useState<AdminKycMetrics | null>(null);
   const detailRequest = useRef(0);
 
   const selected = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
@@ -71,7 +73,12 @@ export default function KycPage() {
       setLoadError(null);
     }
     try {
-      useDataStore.setState({ kyc: await listAdminKyc() });
+      const [list, nextMetrics] = await Promise.all([
+        listAdminKyc(),
+        getAdminKycMetrics().catch(() => null),
+      ]);
+      useDataStore.setState({ kyc: list });
+      setMetrics(nextMetrics);
     } catch (error) {
       if (silent) {
         toast.error(errorMessage(error, "Unable to refresh KYC records."));
@@ -166,10 +173,39 @@ export default function KycPage() {
         onSelectedIdChange={setSelectedId}
         drawerClassName="sm:max-w-2xl"
         kpis={[
-          { label: "Awaiting review", value: String(rows.filter((r) => r.status === "Under Review").length), tone: "warning" },
-          { label: "Changes requested", value: String(rows.filter((r) => r.status === "Changes Requested").length) },
-          { label: "Not submitted", value: String(rows.filter((r) => r.status === "Pending").length) },
-          { label: "Approved", value: String(rows.filter((r) => r.status === "Approved").length), tone: "success" },
+          {
+            label: "Awaiting review",
+            value: String(metrics?.status.UNDER_REVIEW ?? rows.filter((r) => r.status === "Under Review").length),
+            tone: "warning",
+          },
+          {
+            label: "Changes requested",
+            value: String(
+              metrics?.status.CHANGES_REQUESTED ?? rows.filter((r) => r.status === "Changes Requested").length,
+            ),
+          },
+          {
+            label: "Not submitted",
+            value: String(metrics?.status.NOT_SUBMITTED ?? rows.filter((r) => r.status === "Pending").length),
+          },
+          {
+            label: "Approved",
+            value: String(metrics?.status.APPROVED ?? rows.filter((r) => r.status === "Approved").length),
+            tone: "success",
+          },
+          {
+            label: "PAN / GST failed",
+            value: String(
+              metrics
+                ? metrics.pan.failed + metrics.gst.failed
+                : rows.filter((r) => r.panVerification === "Failed" || r.gstVerification === "Failed").length,
+            ),
+          },
+          {
+            label: "GST/PAN mismatch",
+            value: String(metrics?.mismatches ?? rows.filter((r) => r.panGstMismatch).length),
+            tone: "warning",
+          },
         ]}
         columns={[
           {
@@ -208,13 +244,32 @@ export default function KycPage() {
               </span>
             ),
           },
+          {
+            key: "pan",
+            header: "PAN",
+            accessor: (r) => r.panVerification ?? "Not Started",
+            render: (r) => <StatusBadge value={r.panVerification ?? "Not Started"} />,
+          },
+          {
+            key: "gstVerification",
+            header: "GST",
+            accessor: (r) => r.gstVerification ?? "Not Started",
+            render: (r) => (
+              <span className="inline-flex flex-wrap items-center gap-1">
+                <StatusBadge value={r.gstVerification ?? "Not Started"} />
+                {r.panGstMismatch ? <StatusBadge value="Mismatch" className="border-red-200 bg-red-50 text-red-700" /> : null}
+              </span>
+            ),
+          },
           { key: "risk", header: "Risk", render: (r) => <StatusBadge value={r.risk} /> },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
           { key: "source", header: "Source", render: (r) => <SourceBadge source={r.source} /> },
         ]}
-        searchPlaceholder="Search by company, GSTIN, PAN or phone"
+        searchPlaceholder="Search by company, ID, GSTIN, PAN, email or phone"
         searchFn={(r, q) =>
-          `${r.entity} ${r.entityType} ${r.gst} ${r.pan} ${r.phone ?? ""} ${r.email ?? ""}`.toLowerCase().includes(q)
+          `${r.entity} ${r.entityType} ${r.entityId ?? ""} ${r.gst} ${r.pan} ${r.contact ?? ""} ${r.phone ?? ""} ${r.email ?? ""}`
+            .toLowerCase()
+            .includes(q)
         }
         filters={[
           { label: "Under Review", value: "Under Review", predicate: (r) => r.status === "Under Review" },
@@ -224,6 +279,22 @@ export default function KycPage() {
           { label: "Rejected", value: "Rejected", predicate: (r) => r.status === "Rejected" },
           { label: "Sellers", value: "Seller", predicate: (r) => r.entityType === "Seller" },
           { label: "Customers", value: "Customer", predicate: (r) => r.entityType === "Customer" },
+          { label: "PAN verified", value: "pan-verified", predicate: (r) => r.panVerification === "Verified" },
+          { label: "PAN failed", value: "pan-failed", predicate: (r) => r.panVerification === "Failed" },
+          { label: "GST verified", value: "gst-verified", predicate: (r) => r.gstVerification === "Verified" },
+          { label: "GST failed", value: "gst-failed", predicate: (r) => r.gstVerification === "Failed" },
+          {
+            label: "Manual review",
+            value: "manual-review",
+            predicate: (r) => r.panVerification === "Manual Review" || r.gstVerification === "Manual Review",
+          },
+          { label: "GST/PAN mismatch", value: "mismatch", predicate: (r) => Boolean(r.panGstMismatch) },
+          { label: "Documents pending", value: "documents-pending", predicate: (r) => Boolean(r.documentsPending) },
+          {
+            label: "Documents missing",
+            value: "documents-missing",
+            predicate: (r) => r.status !== "Approved" && Boolean(r.documentsMissing?.length),
+          },
         ]}
         emptyTitle="No KYC records found."
         emptyDescription="Seller onboarding and customer KYC submitted from the apps will appear here."
@@ -235,6 +306,9 @@ export default function KycPage() {
           status: r.status,
           gstin: r.gst,
           pan: r.pan,
+          panVerification: r.panVerification ?? "Not Started",
+          gstVerification: r.gstVerification ?? "Not Started",
+          panGstMismatch: r.panGstMismatch ? "Yes" : "No",
           documents: r.documents,
           pending: r.documentsPending ?? 0,
           missing: r.documentsMissing?.join("; ") ?? "",

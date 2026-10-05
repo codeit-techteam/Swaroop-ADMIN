@@ -14,10 +14,12 @@ import {
   getAdminDashboard,
   type AdminDashboardSummary,
 } from "@/lib/api/control-center";
+import { getAdminKycMetrics } from "@/lib/api/ops";
 import { downloadCsv } from "@/lib/csv";
 import { displayMoney } from "@/lib/credit-format";
 import { formatDateTime, greetingForNow } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
+import type { AdminKycMetrics } from "@/types";
 
 const RANGES = [
   { label: "All", days: undefined },
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const [days, setDays] = useState<number | undefined>(30);
   const [summary, setSummary] = useState<AdminDashboardSummary | null>(null);
+  const [kyc, setKyc] = useState<AdminKycMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +40,12 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      setSummary(await getAdminDashboard(days));
+      const [nextSummary, nextKyc] = await Promise.all([
+        getAdminDashboard(days),
+        getAdminKycMetrics().catch(() => null),
+      ]);
+      setSummary(nextSummary);
+      setKyc(nextKyc);
     } catch (cause) {
       setSummary(null);
       setError(describeApiFailure(cause));
@@ -88,6 +96,14 @@ export default function DashboardPage() {
                   { metric: "Pending KYC", value: ops.customers.pendingKyc },
                   { metric: "Active sellers", value: ops.sellers.active },
                   { metric: "Pending seller approvals", value: ops.sellers.pendingApproval },
+                  ...(kyc
+                    ? [
+                        { metric: "KYC awaiting review", value: kyc.status.UNDER_REVIEW ?? 0 },
+                        { metric: "PAN verified", value: kyc.pan.verified },
+                        { metric: "GST verified", value: kyc.gst.verified },
+                        { metric: "GST/PAN mismatches", value: kyc.mismatches },
+                      ]
+                    : []),
                   { metric: "Orders", value: ops.orders.total },
                   { metric: "Open negotiations", value: ops.importTrading.openNegotiations },
                   { metric: "Confirmed import deals", value: ops.importTrading.confirmedDeals },
@@ -128,6 +144,40 @@ export default function DashboardPage() {
               <KpiCard label="Suspended sellers" value={String(ops.sellers.suspended)} href="/sellers" tone="danger" />
             </div>
           </section>
+
+          {kyc ? (
+            <section className="rounded-md border bg-white p-4 shadow-soft">
+              <p className="section-label mb-3">KYC verification</p>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard label="Awaiting review" value={String(kyc.status.UNDER_REVIEW ?? 0)} href="/kyc" tone="warning" />
+                <KpiCard label="Changes requested" value={String(kyc.status.CHANGES_REQUESTED ?? 0)} href="/kyc" />
+                <KpiCard label="Approved" value={String(kyc.status.APPROVED ?? 0)} href="/kyc" tone="success" />
+                <KpiCard label="Rejected" value={String(kyc.status.REJECTED ?? 0)} href="/kyc" tone="danger" />
+                <KpiCard
+                  label="PAN verified / failed"
+                  value={`${kyc.pan.verified} / ${kyc.pan.failed}`}
+                  href="/kyc"
+                />
+                <KpiCard
+                  label="GST verified / failed"
+                  value={`${kyc.gst.verified} / ${kyc.gst.failed}`}
+                  href="/kyc"
+                />
+                <KpiCard
+                  label="GST/PAN mismatches"
+                  value={String(kyc.mismatches)}
+                  href="/kyc"
+                  tone={kyc.mismatches ? "danger" : "default"}
+                />
+                <KpiCard
+                  label="Documents pending review"
+                  value={String(kyc.documentsPending)}
+                  href="/kyc"
+                  tone="warning"
+                />
+              </div>
+            </section>
+          ) : null}
 
           <section className="rounded-md border bg-white p-4 shadow-soft">
             <p className="section-label mb-3">Orders</p>

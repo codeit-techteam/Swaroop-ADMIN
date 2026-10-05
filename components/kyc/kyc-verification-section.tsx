@@ -19,7 +19,10 @@ const DETAIL_LABELS: Record<string, string> = {
   constitution: "Constitution",
   address: "Principal address",
   state: "State",
+  stateCode: "State code",
   pincode: "Pincode",
+  panMasked: "Linked PAN",
+  cancellationDate: "Cancelled on",
 };
 
 function VerificationCard({ label, verification }: { label: string; verification: AdminKycVerification | null }) {
@@ -55,6 +58,16 @@ function VerificationCard({ label, verification }: { label: string; verification
       </p>
       {verification.failureCode && verification.status !== "Verified" ? (
         <p className="mt-0.5 text-[11px] text-muted-foreground">Code: {verification.failureCode}</p>
+      ) : null}
+      {verification.source || verification.providerReference ? (
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {[
+            verification.source ? `Source: ${verification.source}` : null,
+            verification.providerReference ? `Ref: ${verification.providerReference}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
       ) : null}
       {facts.length ? (
         <dl className="mt-2 grid gap-x-4 gap-y-1 rounded bg-slate-50 p-2 text-xs sm:grid-cols-2">
@@ -111,6 +124,13 @@ export function KycVerificationSection({ detail }: { detail: AdminKycDetail }) {
           <VerificationCard label="PAN" verification={verifications.pan} />
           <VerificationCard label="GSTIN" verification={verifications.gst} />
         </div>
+        {verifications.mismatch ? (
+          <p className="mt-2 flex items-start gap-1.5 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            GST/PAN mismatch: the PAN associated with the GSTIN does not match the verified PAN. KYC cannot be
+            approved until the customer or seller verifies matching details.
+          </p>
+        ) : null}
         {detail.warnings.length ? (
           <ul className="mt-2 grid gap-1">
             {detail.warnings.map((warning) => (

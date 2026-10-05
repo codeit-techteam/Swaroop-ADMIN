@@ -10,7 +10,6 @@ export { payments } from "./payments";
 export { procurementActivities, procurementQueue, purchaseRequests } from "./procurement";
 export { shipments } from "./shipments";
 export { disputes } from "./disputes";
-export { kycRecords } from "./kyc";
 export {
   creditAccounts,
   receivables,
