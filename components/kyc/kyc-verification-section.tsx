@@ -9,6 +9,7 @@ import type { AdminKycBusiness, AdminKycDetail, AdminKycVerification } from "@/t
 
 const DETAIL_LABELS: Record<string, string> = {
   nameOnPan: "Name on PAN",
+  dateOnPan: "Date of birth / incorporation",
   panStatus: "PAN status",
   panCategory: "Category",
   legalName: "Legal name",
