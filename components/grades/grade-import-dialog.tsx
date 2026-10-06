@@ -166,11 +166,18 @@ export function GradeImportDialog({ open, onOpenChange, onImported }: GradeImpor
 }
 
 function ImportSummary({ summary }: { summary: GradeImportSummary }) {
+  const duplicateTiles: Array<[string, number, string]> =
+    summary.exactDuplicateRows !== undefined && summary.keyMergedRows !== undefined
+      ? [
+          ["Exact duplicates", summary.exactDuplicateRows, summary.exactDuplicateRows ? "bg-amber-50" : "bg-slate-50"],
+          ["Same grade merged", summary.keyMergedRows, summary.keyMergedRows ? "bg-amber-50" : "bg-slate-50"],
+        ]
+      : [["Duplicates merged", summary.duplicateRows, summary.duplicateRows ? "bg-amber-50" : "bg-slate-50"]];
   const tiles: Array<[string, number, string]> = [
     ["Total rows", summary.totalRows, "bg-slate-50"],
     ["Valid rows", summary.validRows, "bg-emerald-50"],
     ["Invalid rows", summary.invalidRows, summary.invalidRows ? "bg-red-50" : "bg-slate-50"],
-    ["Duplicates merged", summary.duplicateRows, summary.duplicateRows ? "bg-amber-50" : "bg-slate-50"],
+    ...duplicateTiles,
     [summary.dryRun ? "Will insert" : "Inserted", summary.inserted, "bg-sky-50"],
     [summary.dryRun ? "Already present" : "Updated", summary.dryRun ? summary.unchanged : summary.updated, "bg-sky-50"],
     ["Unchanged", summary.dryRun ? 0 : summary.unchanged, "bg-slate-50"],
@@ -191,6 +198,12 @@ function ImportSummary({ summary }: { summary: GradeImportSummary }) {
             </div>
           ))}
       </div>
+      {summary.keyMergedRows ? (
+        <p className="text-xs text-muted-foreground">
+          Rows with the same Category, Grade Group, Grade No. and Manufacturer become one grade. The priced Delhi-list
+          row is kept as written; every merged line number is listed in the import report.
+        </p>
+      ) : null}
       {!summary.dryRun ? (
         <p className="text-xs text-muted-foreground">
           {summary.categoriesCreated} categories and {summary.gradeGroupsCreated} grade groups created. The full validation

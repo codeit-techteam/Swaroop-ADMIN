@@ -138,6 +138,10 @@ export interface GradeImportSummary {
   validRows: number;
   invalidRows: number;
   duplicateRows: number;
+  /** Rows identical in every column to an earlier row. Missing on older backends. */
+  exactDuplicateRows?: number;
+  /** Rows sharing Category, Grade Group, Grade No. and Manufacturer with differing values. */
+  keyMergedRows?: number;
   grades: number;
   inserted: number;
   updated: number;
