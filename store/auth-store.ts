@@ -3,7 +3,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { API_BASE_URL, AUTH_REFRESH_KEY, AUTH_TOKEN_KEY } from "@/lib/env";
+import {
+  SESSION_EXPIRED_EVENT,
+  TOKENS_ROTATED_EVENT,
+  clearTokens,
+  getAccessToken,
+  persistTokens,
+} from "@/lib/auth-tokens";
+import { API_BASE_URL, AUTH_REFRESH_KEY } from "@/lib/env";
 import { permissionLabels } from "@/lib/permissions";
 import { clearSessionCookie, hasSessionCookie, setSessionCookie } from "@/lib/session";
 import type { AdminRole, AdminUser } from "@/types";
@@ -16,18 +23,6 @@ interface AuthState {
   logout: () => void;
   setHydrated: () => void;
   finishHydration: () => void;
-}
-
-function persistTokens(accessToken: string, refreshToken?: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
-  if (refreshToken) window.localStorage.setItem(AUTH_REFRESH_KEY, refreshToken);
-}
-
-function clearTokens() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
-  window.localStorage.removeItem(AUTH_REFRESH_KEY);
 }
 
 function mapBackendUser(payload: {
@@ -135,9 +130,31 @@ export const useAuthStore = create<AuthState>()(
       skipHydration: true,
       partialize: (state) => ({ user: state.user, accessToken: state.accessToken }),
       onRehydrateStorage: () => (state) => {
-        if (state?.accessToken) persistTokens(state.accessToken);
-        if (state?.user && state?.accessToken) setSessionCookie();
+        if (!state?.accessToken) return;
+        // The token keys are the source of truth; the persisted copy may predate a silent refresh.
+        const live = getAccessToken();
+        if (live) state.accessToken = live;
+        else persistTokens(state.accessToken);
+        if (state.user) setSessionCookie();
       },
     },
   ),
 );
+
+if (typeof window !== "undefined") {
+  window.addEventListener(TOKENS_ROTATED_EVENT, (event) => {
+    const accessToken = (event as CustomEvent<string>).detail;
+    if (!useAuthStore.getState().user) return;
+    setSessionCookie();
+    useAuthStore.setState({ accessToken });
+  });
+  window.addEventListener(SESSION_EXPIRED_EVENT, () => {
+    if (useAuthStore.getState().user) useAuthStore.getState().logout();
+  });
+  window.addEventListener("storage", (event) => {
+    // Signed out in another tab.
+    if (event.key === AUTH_REFRESH_KEY && !event.newValue && useAuthStore.getState().user) {
+      useAuthStore.getState().logout();
+    }
+  });
+}

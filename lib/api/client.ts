@@ -1,4 +1,11 @@
-import { API_BASE_URL, AUTH_TOKEN_KEY } from "@/lib/env";
+import {
+  getAccessToken,
+  getFreshAccessToken,
+  getRefreshToken,
+  isAccessTokenExpiring,
+  refreshAccessToken,
+} from "@/lib/auth-tokens";
+import { API_BASE_URL } from "@/lib/env";
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -25,28 +32,32 @@ export class ApiError extends Error {
   }
 }
 
-function token() {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
-}
-
-export async function apiRequest<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<{ data: T; meta?: ApiEnvelope<T>["meta"] }> {
+function send(path: string, init: RequestInit, access: string | null) {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   // FormData needs the browser-generated multipart boundary header.
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const access = token();
   if (access) headers.set("Authorization", `Bearer ${access}`);
+  return fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+}
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<{ data: T; meta?: ApiEnvelope<T>["meta"] }> {
+  const access = await getFreshAccessToken();
+  let response = await send(path, init, access);
+
+  if (response.status === 401 && getRefreshToken()) {
+    const latest = getAccessToken();
+    const renewed =
+      latest && latest !== access && !isAccessTokenExpiring(latest, 0)
+        ? latest
+        : await refreshAccessToken();
+    if (renewed) response = await send(path, init, renewed);
+  }
   const payload = (await response.json().catch(() => null)) as
     | ApiEnvelope<T>
     | { message?: string | string[]; code?: string; details?: unknown }
