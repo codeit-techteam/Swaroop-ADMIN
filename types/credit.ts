@@ -58,6 +58,79 @@ export type CreditInsuranceStatus =
   | "CANCELLED"
   | "CLAIMED";
 
+/** Channel a credit application was created from; resolved by the backend, never by clients. */
+export type CreditApplicationSource =
+  | "WEBSITE"
+  | "CUSTOMER_WEB"
+  | "CUSTOMER_APP"
+  | "SELLER_WEB"
+  | "SELLER_APP"
+  | "ADMIN";
+
+/** Stored status, or RESUBMISSION_REQUIRED for a draft reopened by the credit team. */
+export type CreditApplicationDisplayStatus = CreditApplicationStatus | "RESUBMISSION_REQUIRED";
+
+export type CreditKycStatus = "VERIFIED" | "PENDING" | "FAILED" | "MANUAL_REVIEW";
+
+export type CreditAdminAction =
+  | "START_REVIEW"
+  | "REQUEST_DOCUMENTS"
+  | "REQUEST_RESUBMISSION"
+  | "SEND_INSURANCE_REVIEW"
+  | "MARK_ARRANGEMENT_PENDING"
+  | "APPROVE"
+  | "PARTIAL_APPROVE"
+  | "REJECT"
+  | "ASSIGN"
+  | "ADD_REMARK";
+
+export interface CreditKycVerification {
+  status: "VERIFYING" | "VERIFIED" | "FAILED" | "MANUAL_REVIEW";
+  identifierMasked: string;
+  legalName: string | null;
+  tradeName: string | null;
+  gstStatus: string | null;
+  failureReason: string | null;
+  verifiedAt: string | null;
+  updatedAt: string;
+}
+
+export interface CreditApplicationKyc {
+  status: CreditKycStatus;
+  organizationStatus: string;
+  pan: CreditKycVerification | null;
+  gst: CreditKycVerification | null;
+}
+
+export interface CreditApplicationRemark {
+  id: string;
+  remark: string;
+  actorName: string | null;
+  createdAt: string;
+}
+
+export interface CreditApplicationStats {
+  total: number;
+  submitted: number;
+  pendingReview: number;
+  underReview: number;
+  documentsRequired: number;
+  resubmissionRequired: number;
+  approved: number;
+  rejected: number;
+  draftsInProgress: number;
+  website: number;
+  websiteToday: number;
+  websiteThisMonth: number;
+  bySource: Array<{ source: CreditApplicationSource | null; label: string; count: number }>;
+  byStatus: Array<{ status: CreditApplicationStatus; count: number }>;
+}
+
+export interface CreditAssignee {
+  id: string;
+  name: string;
+}
+
 export interface CreditListMeta {
   page: number;
   limit: number;
@@ -98,6 +171,11 @@ export interface CreditApplication {
   id: string;
   applicationNumber: string;
   status: CreditApplicationStatus;
+  displayStatus: CreditApplicationDisplayStatus;
+  resubmissionRequested: boolean;
+  source: CreditApplicationSource | null;
+  sourceLabel: string;
+  kycStatus: CreditKycStatus;
   requestedLimit: string;
   requestedTenureDays: number | null;
   purpose: string | null;
@@ -129,11 +207,13 @@ export interface CreditApplication {
   timeline?: CreditTimelineEvent[];
   storage?: { configured: boolean; pending: boolean };
   applicationDetails?: CreditApplicationDetails | null;
+  availableActions?: CreditAdminAction[];
+  kyc?: CreditApplicationKyc;
+  remarks?: CreditApplicationRemark[];
 }
 
 /** Applicant-supplied details captured by the public website credit flow. */
 export interface CreditApplicationDetails {
-  source: string | null;
   applicant: {
     companyName: string | null;
     contactPerson: string | null;
@@ -158,6 +238,8 @@ export interface CreditTimelineEvent {
   eventType: string;
   description: string;
   actorRole: string | null;
+  actorUserId?: string | null;
+  actorName?: string | null;
   customerVisible: boolean;
   metadata?: unknown;
   createdAt: string;
@@ -267,6 +349,7 @@ export interface CreditDocument {
   ownerId: string;
   organizationId: string | null;
   organizationName: string | null;
+  belongsToApplication?: boolean;
   verificationNotes?: string | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;

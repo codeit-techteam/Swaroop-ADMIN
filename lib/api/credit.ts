@@ -2,6 +2,8 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   CreditAccount,
   CreditApplication,
+  CreditApplicationStats,
+  CreditAssignee,
   CreditAuditEvent,
   CreditDocument,
   CreditInsurance,
@@ -33,6 +35,41 @@ export async function getCreditSummary() {
 export async function listCreditApplications(params: Record<string, string | number | undefined> = {}) {
   const { data, meta } = await apiRequest<CreditApplication[]>(`/admin/credit/applications${qs(params)}`);
   return { items: data ?? [], meta };
+}
+
+export async function getCreditApplicationStats(params: { from?: string; to?: string } = {}) {
+  const { data } = await apiRequest<CreditApplicationStats>(`/admin/credit/applications/stats${qs(params)}`);
+  return data;
+}
+
+export async function listCreditAssignees() {
+  const { data } = await apiRequest<CreditAssignee[]>("/admin/credit/applications/assignees");
+  return data ?? [];
+}
+
+/** Omit `assigneeUserId` to assign the signed-in admin. */
+export async function assignCreditApplication(id: string, assigneeUserId?: string) {
+  const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify(assigneeUserId ? { assigneeUserId } : {}),
+  });
+  return data;
+}
+
+export async function addCreditApplicationRemark(id: string, remark: string) {
+  const { data } = await apiRequest<CreditApplication>(`/admin/credit/applications/${id}/remarks`, {
+    method: "POST",
+    body: JSON.stringify({ remark }),
+  });
+  return data;
+}
+
+export async function requestCreditResubmission(id: string, message: string) {
+  const { data } = await apiRequest<CreditApplication>(
+    `/admin/credit/applications/${id}/request-resubmission`,
+    { method: "POST", body: JSON.stringify({ message }) },
+  );
+  return data;
 }
 
 export async function getCreditApplication(id: string) {

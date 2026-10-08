@@ -14,6 +14,7 @@ const TONE: Record<string, string> = {
   Pending: "bg-amber-50 text-amber-800 border-amber-200",
   "Under Review": "bg-amber-50 text-amber-800 border-amber-200",
   "Changes Requested": "bg-orange-50 text-orange-800 border-orange-200",
+  "Resubmission Required": "bg-orange-50 text-orange-800 border-orange-200",
   Processing: "bg-amber-50 text-amber-800 border-amber-200",
   Negotiation: "bg-amber-50 text-amber-800 border-amber-200",
   "Pending Inv.": "bg-amber-50 text-amber-800 border-amber-200",

@@ -16,6 +16,9 @@ export function CreditReasonDialog({
   destructive,
   amountLabel,
   amountRequired,
+  reasonLabel = "Reason",
+  reasonPlaceholder = "Required for audit",
+  minReasonLength = 3,
   onConfirm,
 }: {
   open: boolean;
@@ -26,6 +29,9 @@ export function CreditReasonDialog({
   destructive?: boolean;
   amountLabel?: string;
   amountRequired?: boolean;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  minReasonLength?: number;
   onConfirm: (input: { reason: string; amount?: number }) => void;
 }) {
   const [reason, setReason] = useState("");
@@ -48,13 +54,17 @@ export function CreditReasonDialog({
         </div>
       ) : null}
       <div className="space-y-1.5">
-        <Label htmlFor="credit-reason">Reason</Label>
+        <Label htmlFor="credit-reason">{reasonLabel}</Label>
         <Textarea
           id="credit-reason"
           value={reason}
+          maxLength={2000}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Required for audit"
+          placeholder={reasonPlaceholder}
         />
+        {minReasonLength > 1 ? (
+          <p className="text-xs text-muted-foreground">At least {minReasonLength} characters.</p>
+        ) : null}
       </div>
     </div>
   );
@@ -77,7 +87,7 @@ export function CreditReasonDialog({
       onConfirm={() => {
         const parsed = amount ? Number(amount) : undefined;
         if (amountRequired && (parsed == null || !Number.isFinite(parsed) || parsed < 0)) return;
-        if (reason.trim().length < 3) return;
+        if (reason.trim().length < minReasonLength) return;
         onConfirm({ reason: reason.trim(), amount: parsed });
         setReason("");
         setAmount("");
