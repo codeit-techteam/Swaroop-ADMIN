@@ -9,6 +9,7 @@ import {
   FileText,
   ScrollText,
   Handshake,
+  Inbox,
   Layers,
   LayoutDashboard,
   PackageSearch,
@@ -77,6 +78,7 @@ export const adminNav: NavSection[] = [
     items: [
       { href: "/logistics", label: "Logistics", icon: Truck },
       { href: "/support", label: "Support Tickets", icon: Headset },
+      { href: "/enquiries", label: "Website Enquiries", icon: Inbox },
     ],
   },
   {

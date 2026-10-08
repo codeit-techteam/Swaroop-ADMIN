@@ -28,6 +28,7 @@ const ALL_ROUTES = [
   "/receivables",
   "/logistics",
   "/support",
+  "/enquiries",
   "/disputes",
   "/analytics",
   "/content",
@@ -48,6 +49,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/orders",
     "/logistics",
     "/support",
+    "/enquiries",
     "/disputes",
     "/master-data",
     "/import-trading",
@@ -86,7 +88,7 @@ const ROLE_ACCESS: Record<AdminRole, RoutePrefix[]> = {
     "/notifications",
     "/profile",
   ],
-  SUPPORT: ["/dashboard", "/customers", "/users", "/support", "/disputes", "/notifications", "/profile"],
+  SUPPORT: ["/dashboard", "/customers", "/users", "/support", "/enquiries", "/disputes", "/notifications", "/profile"],
 };
 
 export function canAccessRoute(role: AdminRole, pathname: string) {

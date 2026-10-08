@@ -37,7 +37,72 @@ import {
 } from "@/lib/credit-format";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
-import type { CreditDocument } from "@/types/credit";
+import type { CreditApplicationDetails, CreditDocument } from "@/types/credit";
+
+function maskPan(pan: string | null | undefined) {
+  if (!pan) return "—";
+  const value = pan.trim().toUpperCase();
+  return value.length === 10 ? `${value.slice(0, 2)}••••••${value.slice(8)}` : "••••••••••";
+}
+
+function ApplicationDetailsSection({ details }: { details: CreditApplicationDetails }) {
+  const { applicant, requirement, declarations } = details;
+  return (
+    <>
+      <p className="section-label mb-3 mt-6">
+        Applicant details{details.source ? ` · ${details.source === "WEBSITE" ? "Website" : details.source}` : ""}
+      </p>
+      <dl>
+        {applicant ? (
+          <>
+            <DetailRow label="Business name" value={applicant.companyName ?? "—"} />
+            <DetailRow label="Contact person" value={applicant.contactPerson ?? "—"} />
+            <DetailRow label="Mobile" value={applicant.mobile ?? "—"} />
+            <DetailRow label="Email" value={applicant.email ?? "—"} />
+            <DetailRow label="Business type" value={applicant.businessType ?? "—"} />
+            <DetailRow
+              label="Location"
+              value={[applicant.city, applicant.state].filter(Boolean).join(", ") || "—"}
+            />
+          </>
+        ) : null}
+        {requirement ? (
+          <>
+            <DetailRow
+              label="Monthly procurement"
+              value={displayMoney(requirement.monthlyProcurement)}
+            />
+            <DetailRow
+              label="Preferred terms"
+              value={requirement.preferredPaymentTermsDays ? `${requirement.preferredPaymentTermsDays} days` : "—"}
+            />
+            <DetailRow label="Time in business" value={requirement.businessDuration ?? "—"} />
+            <DetailRow
+              label="Existing credit facility"
+              value={
+                requirement.existingCreditFacility == null
+                  ? "—"
+                  : requirement.existingCreditFacility
+                    ? `Yes${requirement.existingCreditDetails ? ` — ${requirement.existingCreditDetails}` : ""}`
+                    : "No"
+              }
+            />
+          </>
+        ) : null}
+        {declarations ? (
+          <DetailRow
+            label="Declarations"
+            value={
+              declarations.accepted
+                ? `Accepted${declarations.acceptedAt ? ` ${formatDateTime(declarations.acceptedAt)}` : ""}`
+                : "Not accepted"
+            }
+          />
+        ) : null}
+      </dl>
+    </>
+  );
+}
 
 type DecisionDialog = "approve" | "partial" | "reject" | "documents" | "insurance" | "arrangement";
 
@@ -134,8 +199,9 @@ export default function CreditApplicationDetailPage() {
               <DetailRow label="Contact" value={data.customer.contactName ?? "—"} />
               <DetailRow label="Email" value={data.customer.email ?? "—"} />
               <DetailRow label="GSTIN" value={data.customer.gstin ?? "—"} />
-              <DetailRow label="PAN" value={data.customer.pan ?? "—"} />
+              <DetailRow label="PAN" value={maskPan(data.customer.pan)} />
             </dl>
+            {data.applicationDetails ? <ApplicationDetailsSection details={data.applicationDetails} /> : null}
             <p className="section-label mb-3 mt-6">Requested credit</p>
             <dl>
               <DetailRow label="Requested limit" value={displayMoney(data.requestedLimit)} />

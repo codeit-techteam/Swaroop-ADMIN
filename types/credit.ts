@@ -128,6 +128,29 @@ export interface CreditApplication {
   audit?: CreditAuditEvent[];
   timeline?: CreditTimelineEvent[];
   storage?: { configured: boolean; pending: boolean };
+  applicationDetails?: CreditApplicationDetails | null;
+}
+
+/** Applicant-supplied details captured by the public website credit flow. */
+export interface CreditApplicationDetails {
+  source: string | null;
+  applicant: {
+    companyName: string | null;
+    contactPerson: string | null;
+    mobile: string | null;
+    email: string | null;
+    businessType: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
+  requirement: {
+    monthlyProcurement: number | null;
+    preferredPaymentTermsDays: number | null;
+    businessDuration: string | null;
+    existingCreditFacility: boolean | null;
+    existingCreditDetails: string | null;
+  } | null;
+  declarations: { accepted: boolean; acceptedAt: string | null } | null;
 }
 
 export interface CreditTimelineEvent {
