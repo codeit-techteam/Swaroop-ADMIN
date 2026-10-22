@@ -45,12 +45,30 @@ async function listAll<T>(path: string): Promise<T[]> {
   return pages;
 }
 
+/** Mask identifiers in Admin lists — full values stay on KYC detail / self-view. */
+function maskPanForList(pan: string): string {
+  const v = pan.trim().toUpperCase();
+  if (v.length < 6) return v ? "••••" : "";
+  return `${v.slice(0, 2)}•••••${v.slice(-2)}`;
+}
+
+function maskGstinForList(gstin: string): string {
+  const v = gstin.trim().toUpperCase();
+  if (v.length < 8) return v ? "••••" : "";
+  return `${v.slice(0, 4)}•••••••${v.slice(-4)}`;
+}
+
 export function mapAdminCustomer(row: Record<string, unknown>): Customer {
   const user = (row.user ?? {}) as Record<string, unknown>;
   const org = (row.organization ?? {}) as Record<string, unknown>;
   const credit = (row.creditProfile ?? {}) as Record<string, unknown>;
   const count = (row._count ?? {}) as Record<string, unknown>;
   const name = String(org.legalName ?? org.name ?? user.displayName ?? "Customer");
+  // Prefer backend-computed overall KYC (metadata.kyc), not org.verificationStatus alone.
+  const overall =
+    row.kycStatus != null
+      ? String(row.kycStatus)
+      : String(org.verificationStatus ?? "");
   return {
     id: String(row.id),
     company: name,
@@ -58,7 +76,7 @@ export function mapAdminCustomer(row: Record<string, unknown>): Customer {
     email: String(user.email ?? ""),
     phone: String(user.phone ?? ""),
     location: "India",
-    kycStatus: mapKycStatus(String(org.verificationStatus ?? "")),
+    kycStatus: mapKycStatus(overall),
     creditLimit: num(credit.approvedLimit),
     usedCredit: num(credit.utilizedAmount ?? credit.outstandingAmount),
     orders: num(count.orders ?? count.purchaseRequests),
@@ -66,8 +84,8 @@ export function mapAdminCustomer(row: Record<string, unknown>): Customer {
     status: String(row.status ?? user.status ?? "ACTIVE") === "SUSPENDED" ? "Suspended" : "Active",
     lastActive: iso(row.updatedAt ?? row.createdAt),
     source: "Customer Web",
-    gst: String(org.gstin ?? ""),
-    pan: String(org.pan ?? ""),
+    gst: maskGstinForList(String(org.gstin ?? "")),
+    pan: maskPanForList(String(org.pan ?? "")),
     addresses: [],
   };
 }
@@ -76,6 +94,13 @@ export function mapAdminSeller(row: Record<string, unknown>): Seller {
   const user = (row.user ?? {}) as Record<string, unknown>;
   const org = (row.organization ?? {}) as Record<string, unknown>;
   const count = (row._count ?? {}) as Record<string, unknown>;
+  // Seller overall KYC = SellerStatus / onboarding — not org.verificationStatus alone.
+  const overall =
+    row.kycStatus != null
+      ? String(row.kycStatus)
+      : row.onboardingStatus != null
+        ? String(row.onboardingStatus)
+        : String(org.verificationStatus ?? "");
   return {
     id: String(row.id),
     company: String(org.legalName ?? org.name ?? "Seller"),
@@ -83,7 +108,7 @@ export function mapAdminSeller(row: Record<string, unknown>): Seller {
     email: String(user.email ?? ""),
     phone: String(user.phone ?? ""),
     location: "India",
-    kycStatus: mapKycStatus(String(org.verificationStatus ?? "")),
+    kycStatus: mapKycStatus(overall),
     products: num(count.products),
     offers: num(count.offers),
     orders: num(count.orders),
@@ -92,8 +117,8 @@ export function mapAdminSeller(row: Record<string, unknown>): Seller {
     status: String(row.status ?? "ACTIVE") === "SUSPENDED" ? "Suspended" : "Active",
     lastActive: iso(row.updatedAt ?? row.createdAt),
     source: "Seller Web",
-    gst: String(org.gstin ?? ""),
-    pan: String(org.pan ?? ""),
+    gst: maskGstinForList(String(org.gstin ?? "")),
+    pan: maskPanForList(String(org.pan ?? "")),
   };
 }
 
@@ -299,9 +324,16 @@ function mapKycStatus(status?: string): KycRecord["status"] {
       return "Rejected";
     case "UNDER_REVIEW":
     case "SUBMITTED":
+    case "PENDING_VERIFICATION":
+    case "PENDING_KYC":
       return "Under Review";
+    case "CHANGES_REQUESTED":
+    case "IN_PROGRESS":
+    case "DRAFT":
+      return "Pending";
     case "EXPIRED":
       return "Expired";
+    case "NOT_SUBMITTED":
     default:
       return "Pending";
   }
