@@ -32,7 +32,13 @@ interface RequestChangesDialogProps {
   slots: AdminKycSlot[];
   /** Pre-selects this document when opened from a document row. */
   initialDocumentId?: string | null;
-  onSubmit: (reason: string, documentIds: string[]) => Promise<void>;
+  /** Approved sellers must unlock GST/PAN before changes can be requested. */
+  approved?: boolean;
+  onSubmit: (
+    reason: string,
+    documentIds: string[],
+    options?: { resetIdentity?: boolean },
+  ) => Promise<void>;
 }
 
 export function RequestChangesDialog({
@@ -42,24 +48,28 @@ export function RequestChangesDialog({
   audience,
   slots,
   initialDocumentId,
+  approved = false,
   onSubmit,
 }: RequestChangesDialogProps) {
   const [reason, setReason] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [resetIdentity, setResetIdentity] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setReason("");
     setSelected(initialDocumentId ? [initialDocumentId] : []);
-  }, [open, initialDocumentId]);
+    setResetIdentity(approved && audience === "seller");
+  }, [open, initialDocumentId, approved, audience]);
 
   const missing = useMemo(
     () => slots.filter((slot) => slot.required && !slot.document).map((slot) => slot.name),
     [slots],
   );
   const trimmed = reason.trim();
-  const invalid = trimmed.length < 5;
+  const identityRequired = approved && audience === "seller";
+  const invalid = trimmed.length < 5 || (identityRequired && !resetIdentity);
 
   const toggle = (id: string, checked: boolean) =>
     setSelected((prev) => (checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)));
@@ -68,7 +78,9 @@ export function RequestChangesDialog({
     if (invalid) return;
     setBusy(true);
     try {
-      await onSubmit(trimmed, selected);
+      await onSubmit(trimmed, selected, {
+        resetIdentity: audience === "seller" ? resetIdentity : undefined,
+      });
       onOpenChange(false);
     } catch {
       // onSubmit reports its own error; keep the dialog open so the admin can retry.
@@ -143,6 +155,24 @@ export function RequestChangesDialog({
           ))}
         </div>
 
+        {audience === "seller" ? (
+          <div className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2.5">
+            <Checkbox
+              id="reset-identity"
+              checked={resetIdentity}
+              disabled={identityRequired}
+              onCheckedChange={(checked) => setResetIdentity(checked === true)}
+            />
+            <label htmlFor="reset-identity" className="text-sm leading-snug text-slate-800">
+              <span className="font-medium">Require GSTIN / PAN re-verification</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Clears Surepass verification flags so the seller must verify GST and PAN again
+                before resubmitting. Required for approved sellers.
+              </span>
+            </label>
+          </div>
+        ) : null}
+
         <div className="grid gap-1.5">
           <Label htmlFor="request-changes-reason">What needs to change? (required)</Label>
           <Textarea
@@ -153,8 +183,13 @@ export function RequestChangesDialog({
             placeholder={`Shown to the ${audience} exactly as written`}
             onChange={(event) => setReason(event.target.value)}
           />
-          {reason && invalid ? (
+          {reason && trimmed.length < 5 ? (
             <p className="text-xs text-destructive">Please describe the change in a few words.</p>
+          ) : null}
+          {identityRequired && !resetIdentity ? (
+            <p className="text-xs text-destructive">
+              Enable GST/PAN re-verification to unlock an approved seller.
+            </p>
           ) : null}
         </div>
 
@@ -165,9 +200,11 @@ export function RequestChangesDialog({
           <Button type="button" disabled={busy || invalid} onClick={() => void submit()}>
             {busy
               ? "Sending…"
-              : selected.length
-                ? `Request changes (${selected.length} document${selected.length > 1 ? "s" : ""})`
-                : "Request changes"}
+              : resetIdentity
+                ? "Unlock & request changes"
+                : selected.length
+                  ? `Request changes (${selected.length} document${selected.length > 1 ? "s" : ""})`
+                  : "Request changes"}
           </Button>
         </DialogFooter>
       </DialogContent>

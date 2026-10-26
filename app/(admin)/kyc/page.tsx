@@ -350,10 +350,15 @@ export default function KycPage() {
             <Button
               size="sm"
               variant="outline"
-              disabled={!detail || approved}
+              disabled={!detail || r.status === "Rejected"}
+              title={
+                approved
+                  ? "Unlock GST/PAN re-verification for an approved seller"
+                  : undefined
+              }
               onClick={() => setDialog({ kind: "changes" })}
             >
-              Request Changes
+              {approved ? "Unlock / Changes" : "Request Changes"}
             </Button>
           </div>
         )}
@@ -425,12 +430,16 @@ export default function KycPage() {
             onOpenChange={(open) => !open && setDialog(null)}
             entityName={selected.entity}
             audience={audience}
+            approved={approved}
             slots={detail.slots}
             initialDocumentId={dialog?.kind === "changes" ? dialog.documentId : null}
-            onSubmit={(reason, documentIds) =>
+            onSubmit={(reason, documentIds, options) =>
               runAction(
-                () => requestAdminKycChanges(selected, reason, documentIds),
-                `Changes requested — ${selected.entity} has been notified.`,
+                () =>
+                  requestAdminKycChanges(selected, reason, documentIds, options),
+                options?.resetIdentity
+                  ? `GST/PAN unlocked — ${selected.entity} must re-verify via Surepass.`
+                  : `Changes requested — ${selected.entity} has been notified.`,
                 "Could not request changes.",
               )
             }

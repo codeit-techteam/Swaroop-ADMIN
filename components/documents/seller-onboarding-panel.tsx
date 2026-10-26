@@ -146,10 +146,23 @@ export function SellerOnboardingPanel({
     };
   });
 
-  const requestChanges = async (reason: string, documentIds: string[]) => {
+  const requestChanges = async (
+    reason: string,
+    documentIds: string[],
+    options?: { resetIdentity?: boolean },
+  ) => {
     try {
-      await requestAdminKycChanges({ entityType: "Seller", entityId: review.id }, reason, documentIds);
-      toast.success(`Changes requested — ${review.company} has been notified.`);
+      await requestAdminKycChanges(
+        { entityType: "Seller", entityId: review.id },
+        reason,
+        documentIds,
+        options,
+      );
+      toast.success(
+        options?.resetIdentity
+          ? `GST/PAN unlocked — ${review.company} must re-verify via Surepass.`
+          : `Changes requested — ${review.company} has been notified.`,
+      );
       await load();
       onChanged?.();
     } catch (changeError) {
@@ -262,10 +275,15 @@ export function SellerOnboardingPanel({
           type="button"
           size="sm"
           variant="outline"
-          disabled={approved}
+          disabled={review.status === "REJECTED"}
+          title={
+            approved
+              ? "Unlock GST/PAN re-verification for an approved seller"
+              : undefined
+          }
           onClick={() => setDialog("changes")}
         >
-          Request changes
+          {approved ? "Unlock / Changes" : "Request changes"}
         </Button>
       </div>
 
@@ -274,6 +292,7 @@ export function SellerOnboardingPanel({
         onOpenChange={(open) => !open && setDialog(null)}
         entityName={review.company}
         audience="seller"
+        approved={approved}
         slots={changeSlots}
         initialDocumentId={activeDocumentId}
         onSubmit={requestChanges}

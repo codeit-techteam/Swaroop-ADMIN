@@ -45,6 +45,7 @@ const ACTION_LABELS: Record<string, string> = {
   SELLER_APPROVED: "Seller approved",
   SELLER_REJECTED: "Seller rejected",
   SELLER_CHANGES_REQUESTED: "Changes requested",
+  SELLER_IDENTITY_REVERIFICATION_REQUESTED: "GST/PAN re-verification unlocked",
 };
 
 const DETAIL_LABELS: Record<string, string> = {

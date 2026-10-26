@@ -632,10 +632,15 @@ export async function requestAdminKycChanges(
   record: Pick<KycRecord, "entityType" | "entityId">,
   reason: string,
   documentIds: string[],
+  options?: { resetIdentity?: boolean },
 ) {
   await apiRequest(`${kycPath(record)}/request-changes`, {
     method: "POST",
-    body: JSON.stringify({ reason, documentIds }),
+    body: JSON.stringify({
+      reason,
+      documentIds,
+      ...(options?.resetIdentity ? { resetIdentity: true } : {}),
+    }),
   });
 }
 
