@@ -180,7 +180,7 @@ export function DetailsSkeleton({ rows = 8 }: { rows?: number }) {
 
 export function ShellSkeleton() {
   return (
-    <div className="flex min-h-screen bg-[#F4F6F9]" aria-busy="true" aria-label="Loading PetroTrade OS">
+    <div className="flex min-h-screen bg-[#F4F6F9]" aria-busy="true" aria-label="Loading PolyStoreX OS">
       <aside className="hidden w-[260px] shrink-0 border-r bg-white p-4 lg:block">
         <Skeleton className="h-8 w-36" />
         <div className="mt-8 space-y-2">

@@ -318,7 +318,7 @@ export const banners: Banner[] = [
     mobileImage: img("Welcome Back", "Industrial procurement in one OS", "#0B1220", "#1D4ED8", true),
     desktopMediaId: "MED-1019",
     mobileMediaId: "MED-1020",
-    headline: "Welcome back to PetroTrade",
+    headline: "Welcome back to PolyStoreX",
     subheadline: "Track orders, offers and credit from one place.",
     ctaText: "Continue",
     ctaAction: "NO_ACTION",

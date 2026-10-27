@@ -199,6 +199,16 @@ export type ImportListing = {
   } | null;
   createdAt: string;
   updatedAt: string;
+  /** Present on DRAFT listings — publish readiness from backend validation. */
+  completeness?: ImportListingCompleteness;
+};
+
+export type ImportListingCompleteness = {
+  isComplete: boolean;
+  canPublish: boolean;
+  missingFields: string[];
+  missingFieldLabels: string[];
+  validationErrors: { field: string; code: string; message: string }[];
 };
 
 export type ImportCriterionEvidence = {

@@ -116,8 +116,13 @@ export default function LoginPage() {
         />
 
         <div className="relative flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-            <ShieldCheck className="size-5" />
+          <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-white/15">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/polystorex-logo.png"
+              alt="PolyStoreX"
+              className="size-10 object-contain"
+            />
           </span>
           <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
         </div>
@@ -157,8 +162,13 @@ export default function LoginPage() {
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
         <div className="w-full max-w-[420px]">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-navy text-white">
-              <ShieldCheck className="size-5" />
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/polystorex-logo.png"
+                alt="PolyStoreX"
+                className="size-10 object-contain"
+              />
             </span>
             <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
           </div>

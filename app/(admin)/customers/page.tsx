@@ -67,7 +67,7 @@ export default function CustomersPage() {
           { key: "email", header: "Email", accessor: (r) => r.email },
           { key: "location", header: "Location", accessor: (r) => r.location },
           { key: "kyc", header: "KYC", render: (r) => <StatusBadge value={r.kycStatus} /> },
-          { key: "credit", header: "Credit", render: () => "PetroTrade managed" },
+          { key: "credit", header: "Credit", render: () => "PolyStoreX managed" },
           { key: "orders", header: "Orders", sortable: true, accessor: (r) => r.orders, render: (r) => formatNumber(r.orders) },
           { key: "spend", header: "Spend", sortable: true, accessor: (r) => r.spend, render: (r) => formatInr(r.spend) },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },

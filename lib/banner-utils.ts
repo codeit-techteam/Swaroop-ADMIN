@@ -307,7 +307,7 @@ export function makeBannerImage(opts: {
   <rect x="0" y="0" width="8" height="${height}" fill="#F8B400"/>
   <text x="72" y="${Math.round(height * 0.42)}" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(height * 0.12)}" font-weight="700">${escapeXml(opts.title)}</text>
   <text x="72" y="${Math.round(height * 0.62)}" fill="rgba(255,255,255,0.88)" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(height * 0.055)}">${escapeXml(opts.subtitle)}</text>
-  <text x="72" y="${height - 36}" fill="rgba(255,255,255,0.55)" font-family="Arial, Helvetica, sans-serif" font-size="18">PetroTrade OS</text>
+  <text x="72" y="${height - 36}" fill="rgba(255,255,255,0.55)" font-family="Arial, Helvetica, sans-serif" font-size="18">PolyStoreX OS</text>
 </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

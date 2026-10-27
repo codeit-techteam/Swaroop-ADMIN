@@ -132,11 +132,30 @@ export default function ImportListingDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <ImportBadge value={l.side} />
             <ImportBadge value={l.status} />
+            {l.status === "DRAFT" && l.completeness ? (
+              <span
+                className={
+                  l.completeness.canPublish
+                    ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800"
+                    : "rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
+                }
+              >
+                {l.completeness.canPublish ? "Ready to publish" : "Incomplete draft"}
+              </span>
+            ) : null}
             <span className="text-xs text-muted-foreground">
               Version {l.version} · Valid until {l.validity.validUntil ? formatDateTime(l.validity.validUntil) : "—"}
               {l.validity.isExpired ? " (past)" : ""}
             </span>
           </div>
+          {l.status === "DRAFT" &&
+          l.completeness &&
+          !l.completeness.canPublish &&
+          l.completeness.missingFieldLabels.length ? (
+            <p className="text-sm text-amber-800">
+              Missing: {l.completeness.missingFieldLabels.join(", ")}
+            </p>
+          ) : null}
           {l.cancelReason ? (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               Cancellation reason: {l.cancelReason}

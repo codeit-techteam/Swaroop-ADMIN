@@ -17,7 +17,7 @@ export default function CreditOverviewPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title="PetroTrade Credit Management"
+        title="PolyStoreX Credit Management"
         description="Admin operates platform credit. Sellers do not provide customer credit."
         breadcrumbs={[{ label: "Finance" }, { label: "Credit Management" }]}
       />

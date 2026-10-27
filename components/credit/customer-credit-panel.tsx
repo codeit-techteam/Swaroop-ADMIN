@@ -41,7 +41,7 @@ export function CustomerCreditPanel({ customerId }: { customerId: string }) {
     return (
       <DetailRow
         label="Credit"
-        value={`No PetroTrade credit account · ${data?.applicationStatus ?? "NOT_APPLIED"}`}
+        value={`No PolyStoreX credit account · ${data?.applicationStatus ?? "NOT_APPLIED"}`}
       />
     );
   }

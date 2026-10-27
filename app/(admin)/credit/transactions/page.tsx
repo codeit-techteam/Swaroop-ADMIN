@@ -37,7 +37,7 @@ export default function CreditTransactionsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Credit Transactions"
-        description="Ledger events posted by PetroTrade Credit Management."
+        description="Ledger events posted by PolyStoreX Credit Management."
         breadcrumbs={[{ label: "Credit Management", href: "/credit" }, { label: "Transactions" }]}
       />
       <CreditToolbar

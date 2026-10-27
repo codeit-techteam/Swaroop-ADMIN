@@ -147,7 +147,7 @@ export const pushNotifications: PushNotification[] = [
     id: "PSH-2406",
     name: "Credit Limit Nudge",
     title: "Credit application still in draft",
-    body: "Finish your PetroTrade credit application to unlock net-payment terms on verified grades.",
+    body: "Finish your PolyStoreX credit application to unlock net-payment terms on verified grades.",
     category: "PAYMENT",
     priority: "NORMAL",
     platforms: ["CUSTOMER_APP"],

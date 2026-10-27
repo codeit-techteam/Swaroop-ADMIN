@@ -25,7 +25,7 @@ export default function CreditAccountsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Credit Accounts"
-        description="PetroTrade credit limits, availability and outstanding balances."
+        description="PolyStoreX credit limits, availability and outstanding balances."
         breadcrumbs={[{ label: "Credit Management", href: "/credit" }, { label: "Accounts" }]}
       />
       <CreditToolbar
@@ -56,7 +56,7 @@ export default function CreditAccountsPage() {
             getRowId={(row) => row.id}
             onRowClick={(row) => router.push(`/credit/accounts/${row.id}`)}
             emptyTitle="No credit accounts found."
-            emptyDescription="Approved PetroTrade credit accounts will appear here."
+            emptyDescription="Approved PolyStoreX credit accounts will appear here."
             columns={[
               { key: "account", header: "Credit Account", accessor: (r) => r.accountNumber ?? r.id },
               { key: "customer", header: "Customer", accessor: (r) => r.customer.name },

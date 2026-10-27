@@ -39,7 +39,7 @@ export default function CreditAccountDetailPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title={data?.accountNumber ?? "Credit account"}
-        description="PetroTrade credit account"
+        description="PolyStoreX credit account"
         breadcrumbs={[
           { label: "Credit Management", href: "/credit" },
           { label: "Accounts", href: "/credit/accounts" },
@@ -110,7 +110,7 @@ export default function CreditAccountDetailPage() {
               rows={data.purchaseOrders ?? []}
               getRowId={(row) => row.id}
               emptyTitle="No credit-linked purchase orders."
-              emptyDescription="Orders paid with Credit — PetroTrade Managed will appear here."
+              emptyDescription="Orders paid with Credit — PolyStoreX Managed will appear here."
               columns={[
                 { key: "po", header: "Purchase Order", accessor: (r) => r.referenceNumber },
                 { key: "method", header: "Payment Method", accessor: (r) => r.paymentMethodLabel },
@@ -192,7 +192,7 @@ export default function CreditAccountDetailPage() {
         open={dialog === "suspend"}
         onOpenChange={(open) => !open && setDialog(null)}
         title="Suspend credit"
-        description="The customer will not be able to use PetroTrade credit until reactivated."
+        description="The customer will not be able to use PolyStoreX credit until reactivated."
         confirmLabel="Suspend"
         destructive
         onConfirm={({ reason }) => {
@@ -204,7 +204,7 @@ export default function CreditAccountDetailPage() {
         open={dialog === "reactivate"}
         onOpenChange={(open) => !open && setDialog(null)}
         title="Reactivate credit"
-        description="Restores an approved PetroTrade credit account to ACTIVE."
+        description="Restores an approved PolyStoreX credit account to ACTIVE."
         confirmLabel="Reactivate"
         onConfirm={({ reason }) => {
           void run(() => reactivateCreditAccount(id, reason), "Credit account reactivated");

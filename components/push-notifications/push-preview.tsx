@@ -32,7 +32,7 @@ export function PushPreviewCard({ values, className }: PushPreviewCardProps) {
                   PT
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-slate-500">PetroTrade</p>
+                  <p className="text-[11px] font-semibold text-slate-500">PolyStoreX</p>
                   <p className="truncate text-sm font-semibold text-slate-900">
                     {values.title || "Notification title"}
                   </p>

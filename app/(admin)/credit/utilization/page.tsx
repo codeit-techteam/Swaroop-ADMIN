@@ -56,7 +56,7 @@ export default function CreditUtilizationPage() {
             getRowId={(row) => row.id}
             onRowClick={(row) => router.push(`/credit/accounts/${row.id}`)}
             emptyTitle="No credit utilization found."
-            emptyDescription="Utilization appears after customers use PetroTrade credit on purchase orders."
+            emptyDescription="Utilization appears after customers use PolyStoreX credit on purchase orders."
             columns={[
               { key: "customer", header: "Customer", accessor: (r) => r.customer.name },
               { key: "limit", header: "Credit Limit", render: (r) => displayMoney(r.approvedLimit) },

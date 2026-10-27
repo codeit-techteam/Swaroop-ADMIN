@@ -6,8 +6,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "PetroTrade OS Admin Portal",
-    template: "%s | PetroTrade OS",
+    default: "PolyStoreX OS Admin Portal",
+    template: "%s | PolyStoreX OS",
   },
   description: "Industrial Procurement Operating System — Admin control center",
 };

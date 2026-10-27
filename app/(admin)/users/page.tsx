@@ -132,7 +132,7 @@ export default function UsersPage() {
         getRowId={(row) => row.id}
         onRowClick={(row) => router.push(`/users/${row.id}`)}
         emptyTitle={loading ? "Loading users…" : "No users found."}
-        emptyDescription="Users from all five PetroTrade applications appear here."
+        emptyDescription="Users from all five PolyStoreX applications appear here."
         columns={[
           {
             key: "name",

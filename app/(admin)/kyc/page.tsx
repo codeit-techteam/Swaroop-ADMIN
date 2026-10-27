@@ -27,7 +27,7 @@ import type { AdminKycDetail, AdminKycDocument, AdminKycMetrics, KycRecord } fro
 const REJECT_PRESETS = [
   "Documents do not match the registered business details.",
   "GST registration is cancelled or could not be verified.",
-  "Business is not eligible to trade on PetroTrade.",
+  "Business is not eligible to trade on PolyStoreX.",
 ];
 
 const DOCUMENT_REJECT_PRESETS = [

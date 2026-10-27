@@ -63,7 +63,7 @@ export default function ReceivablesPage() {
   return (
     <EntityWorkbench
       title="Receivables"
-      description="PetroTrade credit outstanding and collection risk from PostgreSQL."
+      description="PolyStoreX credit outstanding and collection risk from PostgreSQL."
       loading={loading}
       loadingError={loadError}
       onRetry={() => void load()}
@@ -96,7 +96,7 @@ export default function ReceivablesPage() {
         { label: "Collected", value: "Collected", predicate: (r) => r.status === "Collected" },
       ]}
       emptyTitle="No receivables found."
-      emptyDescription="Outstanding PetroTrade credit balances will appear here."
+      emptyDescription="Outstanding PolyStoreX credit balances will appear here."
       exportName="receivables"
       exportRow={(r) => ({ invoice: r.invoice, customer: r.customer, outstanding: r.outstanding, daysOverdue: r.daysOverdue })}
       drawerTitle={(r) => r.invoice}

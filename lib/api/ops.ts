@@ -886,7 +886,7 @@ export function mapAdminProcurement(row: Record<string, unknown>): Procurement {
     requestedDate: createdAt,
     requiredDeliveryDate: iso(row.requiredByDate ?? row.createdAt),
     paymentTerms: String(row.paymentMethod ?? "—"),
-    creditTerms: "PetroTrade managed",
+    creditTerms: "PolyStoreX managed",
     createdAt,
     updatedAt: iso(row.updatedAt ?? row.createdAt),
     timeline: [],

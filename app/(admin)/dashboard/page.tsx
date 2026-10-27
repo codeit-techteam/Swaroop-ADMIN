@@ -66,7 +66,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Admin Dashboard"
         description={`Live counts from Swaroop-Backend · ${rangeLabel} window for flow metrics`}
-        breadcrumbs={[{ label: "PetroTrade OS" }, { label: "Dashboard" }]}
+        breadcrumbs={[{ label: "PolyStoreX OS" }, { label: "Dashboard" }]}
         actions={
           <>
             {RANGES.map((item) => (

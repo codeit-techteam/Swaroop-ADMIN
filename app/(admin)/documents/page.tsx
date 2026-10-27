@@ -26,7 +26,7 @@ import type { PlatformDocument } from "@/types";
 const REJECT_PRESETS = [
   "Document is blurry or unreadable. Please upload a clearer copy.",
   "Document is incomplete — all pages must be visible.",
-  "Details do not match the business registered on PetroTrade.",
+  "Details do not match the business registered on PolyStoreX.",
   "Document has expired. Please upload a valid copy.",
 ];
 

@@ -94,7 +94,7 @@ export function BannerPreview({ open, onOpenChange, banner }: BannerPreviewProps
             )}
           >
             <div className="flex items-center justify-between border-b bg-[#0B1220] px-3 py-2 text-white">
-              <span className="text-xs font-semibold tracking-wide">PetroTrade</span>
+              <span className="text-xs font-semibold tracking-wide">PolyStoreX</span>
               <span className="text-[10px] uppercase text-sky-300">
                 {PLATFORM_LABELS[activePlatform]}
               </span>

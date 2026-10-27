@@ -101,8 +101,13 @@ export function AdminSidebar() {
             collapsed ? "justify-center px-2" : "gap-3 px-4",
           )}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#2563EB] text-[11px] font-bold tracking-wide shadow-sm">
-            PT
+          <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/polystorex-logo.png"
+              alt="PolyStoreX"
+              className="size-9 object-contain"
+            />
           </div>
           {!collapsed ? (
             <div className="min-w-0 flex-1">

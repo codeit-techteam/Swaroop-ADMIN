@@ -22,7 +22,7 @@ export default function CreditAuditPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Credit Audit / History"
-        description="Backend audit events for PetroTrade credit actions. Frontend does not invent timeline entries."
+        description="Backend audit events for PolyStoreX credit actions. Frontend does not invent timeline entries."
         breadcrumbs={[{ label: "Credit Management", href: "/credit" }, { label: "Audit" }]}
       />
       <CreditToolbar
