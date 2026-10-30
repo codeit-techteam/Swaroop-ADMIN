@@ -114,6 +114,10 @@ export interface Offer {
   quantity: number;
   validity: string;
   location: string;
+  /** Customer-facing delivery ETA (synced with marketplace fulfilment). */
+  deliveryEstimate?: string;
+  /** Dispatch window shown on product details. */
+  dispatchWindow?: string;
   remarks: string;
   status: "Draft" | "Pending Review" | "Active" | "Paused" | "Expired" | "Rejected";
   source: Extract<AppSource, "Seller App" | "Seller Web">;

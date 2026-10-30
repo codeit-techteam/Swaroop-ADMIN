@@ -487,13 +487,25 @@ export default function CreditApplicationDetailPage() {
         open={dialog === "approve"}
         onOpenChange={(open) => !open && setDialog(null)}
         title="Approve credit"
-        description="Assign a platform credit limit. This does not create seller credit."
+        description="Assign a platform credit limit and payment tenure. This does not create seller credit."
         confirmLabel="Approve"
         amountLabel="Approved limit (INR)"
         amountRequired
-        onConfirm={({ reason, amount }) => {
+        creditTermDaysLabel="Approved payment terms"
+        defaultCreditTermDays={
+          data?.requestedTenureDays === 15 ? 15 : 30
+        }
+        onConfirm={({ reason, amount, creditTermDays }) => {
           if (amount == null) return;
-          void run(() => approveCreditApplication(id, { approvedLimit: amount, reason }), "Credit application approved");
+          void run(
+            () =>
+              approveCreditApplication(id, {
+                approvedLimit: amount,
+                creditTermDays,
+                reason,
+              }),
+            "Credit application approved",
+          );
           setDialog(null);
         }}
       />
@@ -505,10 +517,19 @@ export default function CreditApplicationDetailPage() {
         confirmLabel="Partial Approve"
         amountLabel="Approved limit (INR)"
         amountRequired
-        onConfirm={({ reason, amount }) => {
+        creditTermDaysLabel="Approved payment terms"
+        defaultCreditTermDays={
+          data?.requestedTenureDays === 15 ? 15 : 30
+        }
+        onConfirm={({ reason, amount, creditTermDays }) => {
           if (amount == null) return;
           void run(
-            () => partialApproveCreditApplication(id, { approvedLimit: amount, reason }),
+            () =>
+              partialApproveCreditApplication(id, {
+                approvedLimit: amount,
+                creditTermDays,
+                reason,
+              }),
             "Credit application partially approved",
           );
           setDialog(null);

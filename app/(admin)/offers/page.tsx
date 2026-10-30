@@ -64,11 +64,20 @@ export default function OffersPage() {
           { key: "qty", header: "Quantity", sortable: true, accessor: (r) => r.quantity },
           { key: "validity", header: "Validity", render: (r) => formatDate(r.validity) },
           { key: "location", header: "Warehouse", accessor: (r) => r.location },
+          {
+            key: "deliveryEstimate",
+            header: "Delivery ETA",
+            accessor: (r) => r.deliveryEstimate ?? "—",
+          },
           { key: "status", header: "Status", render: (r) => <StatusBadge value={r.status} /> },
           { key: "source", header: "Source", render: (r) => <SourceBadge source={r.source} /> },
         ]}
         searchPlaceholder="Search offers"
-        searchFn={(r, q) => `${r.offerNumber ?? ""} ${r.id} ${r.seller} ${r.grade} ${r.location}`.toLowerCase().includes(q)}
+        searchFn={(r, q) =>
+          `${r.offerNumber ?? ""} ${r.id} ${r.seller} ${r.grade} ${r.location} ${r.deliveryEstimate ?? ""}`
+            .toLowerCase()
+            .includes(q)
+        }
         filters={[
           { label: "Draft", value: "Draft", predicate: (r) => r.status === "Draft" },
           { label: "Pending Review", value: "Pending Review", predicate: (r) => r.status === "Pending Review" },
@@ -91,6 +100,8 @@ export default function OffersPage() {
             <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice}`} />
             <DetailRow label="Remarks" value={r.remarks} />
             <DetailRow label="Warehouse" value={r.location} />
+            <DetailRow label="Dispatch within" value={r.dispatchWindow ?? "24 Hours"} />
+            <DetailRow label="Estimated delivery" value={r.deliveryEstimate ?? "—"} />
             <DetailRow label="Validity" value={formatDate(r.validity)} />
             <DetailRow label="Source" value={<SourceBadge source={r.source} />} />
           </dl>

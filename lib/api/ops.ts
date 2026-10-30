@@ -139,12 +139,54 @@ function mapOfferStatus(status?: string): Offer["status"] {
   }
 }
 
+function looksLikeDeliveryTiming(value?: string | null): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  if (/^(ex[\s-]?works|exw|fob|cif|for|dap|ddp|c&f)\b/i.test(v)) return false;
+  return /(\d+\s*[-–to]+\s*\d+|\d+)\s*(business\s*)?(day|days|hour|hours|hr|hrs|week|weeks)\b/i.test(
+    v,
+  );
+}
+
+function estimateDeliveryFromLocation(locationHint?: string | null): string {
+  const hint = (locationHint ?? "").toLowerCase();
+  if (
+    /mumbai|pune|nashik|bhiwandi|gujarat|ahmedabad|vadodara|surat/.test(hint)
+  ) {
+    return "2–3 Business Days";
+  }
+  if (
+    /chennai|kolkata|howrah|delhi|noida|gurgaon|gurugram|hyderabad|bangalore|bengaluru|panipat/.test(
+      hint,
+    )
+  ) {
+    return "3–5 Business Days";
+  }
+  return "4–6 Business Days";
+}
+
 export function mapAdminOffer(row: Record<string, unknown>): Offer {
   const org = (row.organization ?? {}) as Record<string, unknown>;
   const grade = (row.grade ?? {}) as Record<string, unknown>;
   const product = (row.product ?? {}) as Record<string, unknown>;
   const warehouse = (row.warehouse ?? {}) as Record<string, unknown>;
+  const metadata =
+    row.metadata && typeof row.metadata === "object"
+      ? (row.metadata as Record<string, unknown>)
+      : {};
   const count = (row._count ?? {}) as Record<string, unknown>;
+  const location = String(
+    warehouse.city ?? warehouse.name ?? "Assigned hub",
+  );
+  const rawTerms =
+    typeof row.deliveryTerms === "string" ? row.deliveryTerms.trim() : "";
+  const deliveryEstimate = looksLikeDeliveryTiming(rawTerms)
+    ? rawTerms
+    : estimateDeliveryFromLocation(location);
+  const dispatchWindow =
+    typeof metadata.dispatchWindow === "string" && metadata.dispatchWindow.trim()
+      ? metadata.dispatchWindow.trim()
+      : "24 Hours";
   return {
     id: String(row.id),
     offerNumber: row.referenceNumber ? String(row.referenceNumber) : undefined,
@@ -157,12 +199,9 @@ export function mapAdminOffer(row: Record<string, unknown>): Offer {
     bulkPrice: num(row.basePrice),
     quantity: num(row.quantity),
     validity: iso(row.validUntil ?? row.createdAt),
-    location: String(
-      warehouse.name ??
-        warehouse.city ??
-        row.deliveryTerms ??
-        "Assigned hub",
-    ),
+    location,
+    deliveryEstimate,
+    dispatchWindow,
     remarks: String(
       count.purchaseRequestItems != null
         ? `PRs: ${count.purchaseRequestItems}`
