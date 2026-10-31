@@ -31,7 +31,12 @@ import {
   type GradeRequestDetail,
   type GradeRequestStatus,
 } from "@/lib/api/grade-requests";
-import { DEFAULT_GRADE_SORT, EMPTY_GRADE_FILTERS, type Grade, type GradeCategory } from "@/types/grade";
+import {
+  DEFAULT_GRADE_SORT,
+  EMPTY_GRADE_FILTERS,
+  type Grade,
+  type GradeCategory,
+} from "@/types/grade";
 
 type Mode = "status" | "info" | "note" | "map" | "create" | null;
 
@@ -50,9 +55,13 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
   const [message, setMessage] = useState("");
 
   const open = request.isOpen;
-  const nextStatuses = GRADE_REQUEST_TRANSITIONS[request.status].filter((s) => DIRECT_STATUSES.includes(s));
-  const canMap = open && request.status !== "INFO_REQUIRED" && !request.resolvedGrade;
-  const canRequestInfo = GRADE_REQUEST_TRANSITIONS[request.status].includes("INFO_REQUIRED");
+  const nextStatuses = GRADE_REQUEST_TRANSITIONS[request.status].filter((s) =>
+    DIRECT_STATUSES.includes(s),
+  );
+  const canMap =
+    open && request.status !== "INFO_REQUIRED" && !request.resolvedGrade;
+  const canRequestInfo =
+    GRADE_REQUEST_TRANSITIONS[request.status].includes("INFO_REQUIRED");
 
   const close = () => {
     setMode(null);
@@ -60,7 +69,11 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
     setStatus("");
   };
 
-  const run = async <T,>(fn: () => Promise<T>, success: string, after?: (r: T) => void) => {
+  const run = async <T,>(
+    fn: () => Promise<T>,
+    success: string,
+    after?: (r: T) => void,
+  ) => {
     setBusy(true);
     try {
       const result = await fn();
@@ -80,28 +93,49 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        {open && !request.assignedAdmin ? (
+        {open ? (
           <Button
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() => void run(() => assignGradeRequest(request.id), "Assigned to you", onChanged)}
+            onClick={() =>
+              void run(
+                () => assignGradeRequest(request.id),
+                request.assignedAdmin ? "Reassigned to you" : "Assigned to you",
+                onChanged,
+              )
+            }
           >
-            Assign to me
+            {request.assignedAdmin ? "Reassign to me" : "Assign to me"}
           </Button>
         ) : null}
         {canRequestInfo ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("info")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setMode("info")}
+          >
             Request information
           </Button>
         ) : null}
         {canMap ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("map")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setMode("map")}
+          >
             Map to existing grade
           </Button>
         ) : null}
         {canMap ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("create")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setMode("create")}
+          >
             Create new grade
           </Button>
         ) : null}
@@ -110,7 +144,12 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
             Update status
           </Button>
         ) : null}
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setMode("note")}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => setMode("note")}
+        >
           Add internal note
         </Button>
       </div>
@@ -121,7 +160,8 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
           <DialogHeader>
             <DialogTitle>Update status</DialogTitle>
             <DialogDescription>
-              Currently {GRADE_REQUEST_STATUS_LABELS[request.status]}. The customer is notified.
+              Currently {GRADE_REQUEST_STATUS_LABELS[request.status]}. The
+              customer is notified.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -141,7 +181,8 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
             {status ? (
               <div className="space-y-1.5">
                 <Label htmlFor="gr-status-msg">
-                  Message to customer{needsReason ? " (required)" : " (optional)"}
+                  Message to customer
+                  {needsReason ? " (required)" : " (optional)"}
                 </Label>
                 <Textarea
                   id="gr-status-msg"
@@ -158,11 +199,18 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
               Cancel
             </Button>
             <Button
-              disabled={busy || !status || (needsReason && message.trim().length < 3)}
+              disabled={
+                busy || !status || (needsReason && message.trim().length < 3)
+              }
               onClick={() =>
                 status &&
                 void run(
-                  () => updateGradeRequestStatus(request.id, status, message.trim() || undefined),
+                  () =>
+                    updateGradeRequestStatus(
+                      request.id,
+                      status,
+                      message.trim() || undefined,
+                    ),
                   `Status set to ${GRADE_REQUEST_STATUS_LABELS[status]}`,
                   onChanged,
                 )
@@ -179,7 +227,10 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request additional information</DialogTitle>
-            <DialogDescription>This message is shown to the customer in the app and by notification.</DialogDescription>
+            <DialogDescription>
+              This message is shown to the customer in the app and by
+              notification.
+            </DialogDescription>
           </DialogHeader>
           <Textarea
             rows={4}
@@ -213,7 +264,9 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Internal note</DialogTitle>
-            <DialogDescription>Visible to admins only — never shown to the customer.</DialogDescription>
+            <DialogDescription>
+              Visible to admins only — never shown to the customer.
+            </DialogDescription>
           </DialogHeader>
           <Textarea
             rows={4}
@@ -228,7 +281,11 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
             <Button
               disabled={busy || !message.trim()}
               onClick={() =>
-                void run(() => addGradeRequestNote(request.id, message.trim()), "Note saved", onChanged)
+                void run(
+                  () => addGradeRequestNote(request.id, message.trim()),
+                  "Note saved",
+                  onChanged,
+                )
               }
             >
               Save note
@@ -244,7 +301,11 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
           onClose={close}
           onConfirm={(gradeId, msg) =>
             void run(
-              () => mapGradeRequestToGrade(request.id, { gradeId, message: msg || undefined }),
+              () =>
+                mapGradeRequestToGrade(request.id, {
+                  gradeId,
+                  message: msg || undefined,
+                }),
               "Mapped to catalogue grade",
               onChanged,
             )
@@ -307,7 +368,8 @@ function MapGradeDialog({
         );
         if (current === seq.current) setResults(grades);
       } catch (e) {
-        if (current === seq.current) setError(e instanceof Error ? e.message : "Search failed");
+        if (current === seq.current)
+          setError(e instanceof Error ? e.message : "Search failed");
       } finally {
         if (current === seq.current) setSearching(false);
       }
@@ -325,12 +387,23 @@ function MapGradeDialog({
             {request.manufacturer ? ` · ${request.manufacturer}` : ""}
           </DialogDescription>
         </DialogHeader>
-        <Input placeholder="Search catalogue grades" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Input
+          placeholder="Search catalogue grades"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <div className="max-h-56 space-y-1 overflow-y-auto">
-          {searching ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
+          {searching ? (
+            <p className="text-sm text-muted-foreground">Searching…</p>
+          ) : null}
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {!searching && !error && query.trim().length >= 2 && results.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No grades found. You can create a new grade instead.</p>
+          {!searching &&
+          !error &&
+          query.trim().length >= 2 &&
+          results.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No grades found. You can create a new grade instead.
+            </p>
           ) : null}
           {results.map((g) => (
             <button
@@ -338,7 +411,9 @@ function MapGradeDialog({
               type="button"
               onClick={() => setSelected(g)}
               className={`w-full rounded border px-3 py-2 text-left text-sm ${
-                selected?.id === g.id ? "border-primary bg-primary/5" : "hover:bg-slate-50"
+                selected?.id === g.id
+                  ? "border-primary bg-primary/5"
+                  : "hover:bg-slate-50"
               }`}
             >
               <span className="font-medium">{g.gradeName}</span>
@@ -360,7 +435,10 @@ function MapGradeDialog({
           <Button variant="outline" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button disabled={busy || !selected} onClick={() => selected && onConfirm(selected.id, message.trim())}>
+          <Button
+            disabled={busy || !selected}
+            onClick={() => selected && onConfirm(selected.id, message.trim())}
+          >
             Map grade
           </Button>
         </DialogFooter>
@@ -391,7 +469,12 @@ function CreateGradeDialog({
 }) {
   const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [categoryId, setCategoryId] = useState(request.category?.id ?? "");
-  const [code, setCode] = useState(request.gradeName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, ""));
+  const [code, setCode] = useState(
+    request.gradeName
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, ""),
+  );
   const [name, setName] = useState(request.gradeName);
   const [manufacturer, setManufacturer] = useState(request.manufacturer ?? "");
   const [gradeNo, setGradeNo] = useState("");
@@ -412,8 +495,8 @@ function CreateGradeDialog({
         <DialogHeader>
           <DialogTitle>Create catalogue grade</DialogTitle>
           <DialogDescription>
-            The grade is created unpublished (inactive, hidden from customers and sellers). Publish it from Grade
-            Master after verification.
+            The grade is created unpublished (inactive, hidden from customers
+            and sellers). Publish it from Grade Master after verification.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
@@ -432,34 +515,62 @@ function CreateGradeDialog({
               ))}
             </select>
             {request.materialCategory ? (
-              <p className="text-xs text-muted-foreground">Customer asked for: {request.materialCategory}</p>
+              <p className="text-xs text-muted-foreground">
+                Customer asked for: {request.materialCategory}
+              </p>
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Grade code</Label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} maxLength={64} />
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                maxLength={64}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Grade no.</Label>
-              <Input value={gradeNo} onChange={(e) => setGradeNo(e.target.value)} maxLength={64} />
+              <Input
+                value={gradeNo}
+                onChange={(e) => setGradeNo(e.target.value)}
+                maxLength={64}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
             <Label>Grade name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={120}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Manufacturer</Label>
-            <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} maxLength={120} />
+            <Input
+              value={manufacturer}
+              onChange={(e) => setManufacturer(e.target.value)}
+              maxLength={120}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
+            <Textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={2000}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Message to customer (optional)</Label>
-            <Textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
+            <Textarea
+              rows={2}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              maxLength={2000}
+            />
           </div>
         </div>
         <DialogFooter>
