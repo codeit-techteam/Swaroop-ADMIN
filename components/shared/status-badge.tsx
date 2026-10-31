@@ -133,6 +133,10 @@ const TONE: Record<string, string> = {
   "Manual Review": "bg-sky-50 text-sky-700 border-sky-200",
   Verifying: "bg-sky-50 text-sky-700 border-sky-200",
   Missing: "bg-amber-50 text-amber-800 border-amber-200",
+  "Additional Information Required": "bg-orange-50 text-orange-800 border-orange-200",
+  "Grade Identified": "bg-sky-50 text-sky-700 border-sky-200",
+  "Quotation Available": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Converted to Purchase Request": "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 export function StatusBadge({ value, className }: { value: string; className?: string }) {

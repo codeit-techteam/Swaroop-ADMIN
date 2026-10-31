@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   CreditCard,
   Factory,
+  FilePlus2,
   FileText,
   ScrollText,
   Handshake,
@@ -55,7 +56,10 @@ export const adminNav: NavSection[] = [
   },
   {
     label: "MASTER DATA",
-    items: [{ href: "/master-data/grades", label: "Grade Master", icon: Layers }],
+    items: [
+      { href: "/master-data/grades", label: "Grade Master", icon: Layers },
+      { href: "/grade-requests", label: "New Grade Requests", icon: FilePlus2 },
+    ],
   },
   {
     label: "COMMERCE",
