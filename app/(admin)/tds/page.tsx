@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, Upload } from "lucide-react";
+import { CloudDownload, RefreshCw, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ import {
   getTdsPreview,
   listAllTdsDocuments,
   listAllTdsRequests,
+  syncTdsFromStorage,
   updateTdsRequest,
   type TdsDashboard,
   type TdsDocument,
@@ -67,13 +68,17 @@ export default function TdsLibraryPage() {
   const [dashboard, setDashboard] = useState<TdsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
+  const [docFilter, setDocFilter] = useState("all");
+  const [reqFilter, setReqFilter] = useState("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reqNotes, setReqNotes] = useState<Record<string, string>>({});
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replaceDoc, setReplaceDoc] = useState<TdsDocument | null>(null);
+  const [fulfillRequest, setFulfillRequest] = useState<TdsRequest | null>(null);
   const hasLoaded = useRef(false);
 
   const load = useCallback(async (mode: "initial" | "refresh") => {
@@ -124,6 +129,38 @@ export default function TdsLibraryPage() {
     }
   };
 
+  const runStorageSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncTdsFromStorage({ autoVerify: true });
+      toast.success(
+        `Storage sync complete — ${result.created} created, ${result.updated} updated, ${result.verified} verified`,
+      );
+      if (result.needsMapping > 0) {
+        toast.message(
+          `${result.needsMapping} file(s) need grade mapping before publish`,
+        );
+      }
+      setTab("documents");
+      setDocFilter(result.needsMapping > 0 && result.verified === 0 ? "NEEDS_MAPPING" : "all");
+      await load("refresh");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Storage sync failed",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleDocFilter = (value: string) => {
+    setDocFilter((current) => (current === value ? "all" : value));
+  };
+
+  const toggleReqFilter = (value: string) => {
+    setReqFilter((current) => (current === value ? "all" : value));
+  };
+
   const docKpis = useMemo(() => {
     const d = dashboard;
     return [
@@ -131,38 +168,73 @@ export default function TdsLibraryPage() {
         label: "Pending review",
         value: String(d?.pendingReview ?? docs.filter((r) => r.verificationStatus === "PENDING_REVIEW").length),
         tone: "warning" as const,
+        active: docFilter === "PENDING_REVIEW",
+        onClick: () => toggleDocFilter("PENDING_REVIEW"),
       },
       {
         label: "Needs mapping",
         value: String(d?.needsMapping ?? docs.filter((r) => r.verificationStatus === "NEEDS_MAPPING").length),
         tone: "warning" as const,
+        active: docFilter === "NEEDS_MAPPING",
+        onClick: () => toggleDocFilter("NEEDS_MAPPING"),
       },
       {
         label: "Verified",
         value: String(d?.verified ?? docs.filter((r) => r.verificationStatus === "VERIFIED").length),
         tone: "success" as const,
+        active: docFilter === "VERIFIED",
+        onClick: () => toggleDocFilter("VERIFIED"),
       },
       {
         label: "Missing",
         value: String(d?.missing ?? docs.filter((r) => r.verificationStatus === "MISSING").length),
+        active: docFilter === "MISSING",
+        onClick: () => toggleDocFilter("MISSING"),
       },
       {
         label: "Open requests",
         value: String(d?.openRequests ?? requests.filter((r) => r.status === "OPEN" || r.status === "IN_PROGRESS").length),
+        active: false,
+        onClick: () => {
+          setTab("requests");
+          setReqFilter("OPEN");
+        },
       },
     ];
-  }, [dashboard, docs, requests]);
+  }, [dashboard, docs, requests, docFilter]);
 
   const reqKpis = useMemo(() => {
     const count = (status: TdsRequestStatus) =>
       String(requests.filter((r) => r.status === status).length);
     return [
-      { label: "Open", value: count("OPEN"), tone: "warning" as const },
-      { label: "In progress", value: count("IN_PROGRESS") },
-      { label: "Fulfilled", value: count("FULFILLED"), tone: "success" as const },
-      { label: "Closed / rejected", value: String(requests.filter((r) => r.status === "CLOSED" || r.status === "REJECTED").length) },
+      {
+        label: "Open",
+        value: count("OPEN"),
+        tone: "warning" as const,
+        active: reqFilter === "OPEN",
+        onClick: () => toggleReqFilter("OPEN"),
+      },
+      {
+        label: "In progress",
+        value: count("IN_PROGRESS"),
+        active: reqFilter === "IN_PROGRESS",
+        onClick: () => toggleReqFilter("IN_PROGRESS"),
+      },
+      {
+        label: "Fulfilled",
+        value: count("FULFILLED"),
+        tone: "success" as const,
+        active: reqFilter === "FULFILLED",
+        onClick: () => toggleReqFilter("FULFILLED"),
+      },
+      {
+        label: "Closed / rejected",
+        value: String(requests.filter((r) => r.status === "CLOSED" || r.status === "REJECTED").length),
+        active: reqFilter === "CLOSED_REJECTED",
+        onClick: () => toggleReqFilter("CLOSED_REJECTED"),
+      },
     ];
-  }, [requests]);
+  }, [requests, reqFilter]);
 
   const saveRequest = async (
     row: TdsRequest,
@@ -183,6 +255,12 @@ export default function TdsLibraryPage() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const openFulfillUpload = (row: TdsRequest) => {
+    setReplaceDoc(null);
+    setFulfillRequest(row);
+    setUploadOpen(true);
   };
 
   const tabActions = (
@@ -206,21 +284,45 @@ export default function TdsLibraryPage() {
         ))}
       </div>
       {tab === "documents" ? (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncing || refreshing}
+            onClick={() => void runStorageSync()}
+          >
+            <CloudDownload className={cn("size-4", syncing && "animate-pulse")} />
+            {syncing ? "Syncing…" : "Sync from storage"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setReplaceDoc(null);
+              setFulfillRequest(null);
+              setUploadOpen(true);
+            }}
+          >
+            <Upload className="size-4" />
+            Upload TDS
+          </Button>
+        </>
+      ) : (
         <Button
           size="sm"
           onClick={() => {
             setReplaceDoc(null);
+            setFulfillRequest(null);
             setUploadOpen(true);
           }}
         >
           <Upload className="size-4" />
           Upload TDS
         </Button>
-      ) : null}
+      )}
       <Button
         size="sm"
         variant="outline"
-        disabled={refreshing}
+        disabled={refreshing || syncing}
         onClick={() => void load("refresh")}
       >
         <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
@@ -229,11 +331,59 @@ export default function TdsLibraryPage() {
     </>
   );
 
+  const uploadDialog = (
+    <TdsUploadDialog
+      open={uploadOpen}
+      onOpenChange={(next) => {
+        setUploadOpen(next);
+        if (!next) {
+          setReplaceDoc(null);
+          setFulfillRequest(null);
+        }
+      }}
+      replaceDocument={replaceDoc}
+      presetGrade={
+        fulfillRequest
+          ? {
+              gradeId: fulfillRequest.gradeId,
+              gradeName:
+                fulfillRequest.grade?.displayName ??
+                fulfillRequest.grade?.name ??
+                null,
+              gradeCode: fulfillRequest.grade?.code ?? null,
+            }
+          : null
+      }
+      onDone={(doc) => {
+        setSelectedDocId(doc.id);
+        setTab("documents");
+        setDocFilter("VERIFIED");
+        if (fulfillRequest) {
+          setRequests((current) =>
+            current.map((r) =>
+              r.id === fulfillRequest.id
+                ? {
+                    ...r,
+                    status: "FULFILLED",
+                    fulfilledDocumentId: doc.id,
+                    resolvedAt: new Date().toISOString(),
+                  }
+                : r,
+            ),
+          );
+          setSelectedReqId(null);
+        }
+        void load("refresh");
+      }}
+    />
+  );
+
   if (tab === "requests") {
     return (
+      <>
       <EntityWorkbench
         title="TDS Library"
-        description="Customer requests for missing technical data sheets. Update status and leave admin notes."
+        description="Customer requests for missing technical data sheets. Upload a TDS to fulfill, or update status and leave admin notes."
         kpis={reqKpis}
         loading={loading}
         loadingError={loadError}
@@ -243,6 +393,8 @@ export default function TdsLibraryPage() {
         getRowId={(r) => r.id}
         selectedId={selectedReqId}
         onSelectedIdChange={setSelectedReqId}
+        filter={reqFilter}
+        onFilterChange={setReqFilter}
         pageSize={10}
         columns={[
           {
@@ -310,6 +462,11 @@ export default function TdsLibraryPage() {
             value: "CLOSED",
             predicate: (r) => r.status === "CLOSED",
           },
+          {
+            label: "Closed / rejected",
+            value: "CLOSED_REJECTED",
+            predicate: (r) => r.status === "CLOSED" || r.status === "REJECTED",
+          },
         ]}
         emptyTitle="No TDS requests yet."
         emptyDescription="When a customer asks for a missing TDS it will appear here."
@@ -366,8 +523,21 @@ export default function TdsLibraryPage() {
         drawerFooter={(r) => {
           const notes = reqNotes[r.id] ?? r.adminNotes ?? "";
           const next = REQUEST_NEXT[r.status];
+          const canUpload =
+            r.status === "OPEN" || r.status === "IN_PROGRESS";
           return (
             <div className="space-y-3">
+              {canUpload ? (
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={busyId === r.id}
+                  onClick={() => openFulfillUpload(r)}
+                >
+                  <Upload className="size-4" />
+                  Upload TDS to fulfill
+                </Button>
+              ) : null}
               <div className="space-y-1.5">
                 <Label htmlFor={`tds-req-notes-${r.id}`}>Admin notes</Label>
                 <Textarea
@@ -413,6 +583,8 @@ export default function TdsLibraryPage() {
           );
         }}
       />
+      {uploadDialog}
+      </>
     );
   }
 
@@ -420,7 +592,7 @@ export default function TdsLibraryPage() {
     <>
     <EntityWorkbench
       title="TDS Library"
-      description="Upload TDS by marketplace product, or review imported sheets. Titles sync to product names. Approve to publish on Customer App, Customer WebApp, Seller App, and Seller WebApp."
+      description="Upload TDS by marketplace product, sync files already in storage, or review imported sheets. Titles sync to product names. Approve to publish on Customer App, Customer WebApp, Seller App, and Seller WebApp."
       kpis={docKpis}
       loading={loading}
       loadingError={loadError}
@@ -430,6 +602,8 @@ export default function TdsLibraryPage() {
       getRowId={(r) => r.id}
       selectedId={selectedDocId}
       onSelectedIdChange={setSelectedDocId}
+      filter={docFilter}
+      onFilterChange={setDocFilter}
       pageSize={10}
       columns={[
         {
@@ -552,7 +726,7 @@ export default function TdsLibraryPage() {
         },
       ]}
       emptyTitle="No TDS documents yet."
-      emptyDescription="Imported or uploaded technical data sheets will appear here for review."
+      emptyDescription="Imported sheets, admin uploads, or Sync from storage will appear here for review."
       exportName="tds-documents"
       exportRow={(r) => ({
         title: r.documentTitle,
@@ -689,24 +863,14 @@ export default function TdsLibraryPage() {
           onReload={reload}
           onPreview={() => void openPreview(r)}
           onReplace={() => {
+            setFulfillRequest(null);
             setReplaceDoc(r);
             setUploadOpen(true);
           }}
         />
       )}
     />
-    <TdsUploadDialog
-      open={uploadOpen}
-      onOpenChange={(next) => {
-        setUploadOpen(next);
-        if (!next) setReplaceDoc(null);
-      }}
-      replaceDocument={replaceDoc}
-      onDone={(doc) => {
-        setSelectedDocId(doc.id);
-        void load("refresh");
-      }}
-    />
+    {uploadDialog}
     </>
   );
 }

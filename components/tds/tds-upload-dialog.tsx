@@ -28,11 +28,23 @@ import { cn } from "@/lib/utils";
 
 const ACCEPTED = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
 
+type PresetGrade = {
+  gradeId: string;
+  gradeName?: string | null;
+  gradeCode?: string | null;
+  productId?: string | null;
+  productName?: string | null;
+  productCode?: string | null;
+  manufacturer?: string | null;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When set, replaces the existing document file. */
   replaceDocument?: TdsDocument | null;
+  /** Prefill grade/product when fulfilling a TDS request. */
+  presetGrade?: PresetGrade | null;
   onDone: (doc: TdsDocument) => void;
 };
 
@@ -40,6 +52,7 @@ export function TdsUploadDialog({
   open,
   onOpenChange,
   replaceDocument,
+  presetGrade,
   onDone,
 }: Props) {
   const isReplace = Boolean(replaceDocument?.id);
@@ -54,7 +67,7 @@ export function TdsUploadDialog({
 
   useEffect(() => {
     if (!open) return;
-    setQuery("");
+    setQuery(presetGrade?.productName ?? "");
     setFile(null);
     setNotes("");
     setApproveNow(true);
@@ -70,12 +83,26 @@ export function TdsUploadDialog({
         gradeName: replaceDocument.grade?.name ?? null,
         gradeCode: replaceDocument.grade?.code ?? null,
       });
+    } else if (presetGrade?.gradeId) {
+      setSelected({
+        id: presetGrade.productId ?? `grade:${presetGrade.gradeId}`,
+        name:
+          presetGrade.productName ??
+          presetGrade.gradeName ??
+          presetGrade.gradeCode ??
+          "Selected grade",
+        code: presetGrade.productCode ?? presetGrade.gradeCode ?? "",
+        manufacturer: presetGrade.manufacturer ?? null,
+        gradeId: presetGrade.gradeId,
+        gradeName: presetGrade.gradeName ?? null,
+        gradeCode: presetGrade.gradeCode ?? null,
+      });
     } else if (replaceDocument?.gradeId) {
       setSelected(null);
     } else {
       setSelected(null);
     }
-  }, [open, replaceDocument]);
+  }, [open, replaceDocument, presetGrade]);
 
   useEffect(() => {
     if (!open || isReplace) return;
@@ -106,24 +133,32 @@ export function TdsUploadDialog({
   const canSubmit = useMemo(() => {
     if (!file) return false;
     if (isReplace) return true;
-    return Boolean(selected?.id && selected.gradeId);
-  }, [file, isReplace, selected]);
+    return Boolean(selected?.gradeId || presetGrade?.gradeId);
+  }, [file, isReplace, selected, presetGrade]);
 
   const submit = async () => {
     if (!file) {
       toast.error("Choose a PDF or image file");
       return;
     }
-    if (!isReplace && !selected?.gradeId) {
+    if (!isReplace && !selected?.gradeId && !presetGrade?.gradeId) {
       toast.error("Select a product that is linked to a grade");
       return;
     }
     setSubmitting(true);
     try {
+      const productId =
+        selected?.id && !selected.id.startsWith("grade:")
+          ? selected.id
+          : presetGrade?.productId ?? undefined;
       const payload = {
         file,
-        productId: selected?.id,
-        gradeId: selected?.gradeId ?? replaceDocument?.gradeId ?? undefined,
+        productId,
+        gradeId:
+          selected?.gradeId ??
+          presetGrade?.gradeId ??
+          replaceDocument?.gradeId ??
+          undefined,
         notes: notes.trim() || undefined,
         approveNow,
       };
@@ -149,12 +184,18 @@ export function TdsUploadDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {isReplace ? "Replace TDS file" : "Upload TDS for product"}
+            {isReplace
+              ? "Replace TDS file"
+              : presetGrade
+                ? "Upload TDS to fulfill request"
+                : "Upload TDS for product"}
           </DialogTitle>
           <DialogDescription>
             {isReplace
               ? "Upload a new revision. Approve now to publish immediately to customer and seller apps."
-              : "Pick a marketplace product, attach a PDF/image TDS, and optionally publish it immediately. The document title syncs to the product name."}
+              : presetGrade
+                ? "Attach a PDF/image TDS for this grade and publish it to Customer App, Customer WebApp, and Seller panels."
+                : "Pick a marketplace product, attach a PDF/image TDS, and optionally publish it immediately. The document title syncs to the product name."}
           </DialogDescription>
         </DialogHeader>
 

@@ -23,13 +23,23 @@ interface EntityWorkbenchProps<T> {
   title: string;
   description?: string;
   breadcrumbs?: { label: string; href?: string }[];
-  kpis?: { label: string; value: string; href?: string; tone?: "default" | "warning" | "danger" | "success" }[];
+  kpis?: {
+    label: string;
+    value: string;
+    href?: string;
+    onClick?: () => void;
+    active?: boolean;
+    tone?: "default" | "warning" | "danger" | "success";
+  }[];
   rows: T[];
   columns: SimpleColumn<T>[];
   getRowId: (row: T) => string;
   searchPlaceholder?: string;
   searchFn: (row: T, query: string) => boolean;
   filters?: FilterDef<T>[];
+  /** Controlled filter value; defaults to internal "all". */
+  filter?: string;
+  onFilterChange?: (value: string) => void;
   renderDetails: (row: T) => ReactNode;
   drawerTitle?: (row: T) => string;
   drawerDescription?: (row: T) => string;
@@ -61,6 +71,8 @@ export function EntityWorkbench<T>({
   searchPlaceholder = "Search...",
   searchFn,
   filters,
+  filter: controlledFilter,
+  onFilterChange,
   renderDetails,
   drawerTitle,
   drawerDescription,
@@ -80,7 +92,12 @@ export function EntityWorkbench<T>({
   onRetry,
 }: EntityWorkbenchProps<T>) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [internalFilter, setInternalFilter] = useState("all");
+  const filter = controlledFilter !== undefined ? controlledFilter : internalFilter;
+  const setFilter = (value: string) => {
+    setInternalFilter(value);
+    onFilterChange?.(value);
+  };
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const selectedId = controlledSelectedId !== undefined ? controlledSelectedId : internalSelectedId;
   const setSelectedId = (id: string | null) => {

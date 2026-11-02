@@ -386,3 +386,34 @@ export const updateTdsRequest = (
     fulfilledDocumentId?: string;
   },
 ) => post<TdsRequest>(`/admin/tds/requests/${id}`, input);
+
+export type TdsStorageSyncResult = {
+  prefix: string;
+  autoVerify: boolean;
+  scanned: number;
+  skipped: number;
+  created: number;
+  updated: number;
+  verified: number;
+  needsMapping: number;
+  fulfilledRequests: number;
+  sample: string[];
+};
+
+/** Scan R2 `tds/` and upsert library rows so Available matches storage. */
+export async function syncTdsFromStorage(input?: {
+  autoVerify?: boolean;
+  prefix?: string;
+}) {
+  const { data } = await apiRequest<TdsStorageSyncResult>(
+    "/admin/tds/documents/sync-storage",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        autoVerify: input?.autoVerify ?? true,
+        ...(input?.prefix ? { prefix: input.prefix } : {}),
+      }),
+    },
+  );
+  return data;
+}
