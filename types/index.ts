@@ -109,8 +109,10 @@ export interface Offer {
   sellerId: string;
   seller: string;
   grade: string;
+  /** Material selling price ₹/MT (Offer.basePrice). */
   price: number;
   bulkPrice: number;
+  pricingUnit?: "MT";
   quantity: number;
   validity: string;
   location: string;
@@ -122,6 +124,9 @@ export interface Offer {
   status: "Draft" | "Pending Review" | "Active" | "Paused" | "Expired" | "Rejected";
   source: Extract<AppSource, "Seller App" | "Seller Web">;
   updatedAt: string;
+  /** Soft flag — material price below freight needs admin verification. */
+  needsPriceReview?: boolean;
+  priceReviewReason?: string;
 }
 
 export interface Order {

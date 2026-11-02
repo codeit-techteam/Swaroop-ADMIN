@@ -65,19 +65,39 @@ export interface GradeRequestDocument {
   createdAt: string;
 }
 
+export type GradeRequestRequesterType = "CUSTOMER" | "SELLER";
+
+export const GRADE_REQUESTER_TYPE_LABELS: Record<GradeRequestRequesterType, string> = {
+  CUSTOMER: "Customer",
+  SELLER: "Seller",
+};
+
+export interface GradeRequestRequester {
+  type: GradeRequestRequesterType;
+  profileId: string | null;
+  organizationId: string | null;
+  companyName: string | null;
+  accountEmail: string | null;
+  accountPhone: string | null;
+}
+
 export interface GradeRequest {
   id: string;
   referenceNumber: string;
   status: GradeRequestStatus;
   statusLabel: string;
   isOpen: boolean;
-  customer: {
-    customerProfileId: string;
-    organizationId: string;
-    companyName: string;
+  /** Absent on payloads that predate seller requesters. */
+  requesterType?: GradeRequestRequesterType;
+  requester?: GradeRequestRequester;
+  /** Kept for compatibility; fields are null for SELLER requests. */
+  customer?: {
+    customerProfileId: string | null;
+    organizationId: string | null;
+    companyName: string | null;
     accountEmail: string | null;
     accountPhone: string | null;
-  };
+  } | null;
   contact: { name: string; phone: string; email: string | null };
   gradeName: string;
   materialCategory: string;
@@ -124,13 +144,34 @@ export interface GradeRequestSummary {
   unassigned: number;
 }
 
-export async function listGradeRequests(): Promise<GradeRequest[]> {
+/** Resolved requester type, tolerating old payloads that only carry `customer`. */
+export function getRequesterType(r: GradeRequest): GradeRequestRequesterType {
+  return r.requester?.type ?? r.requesterType ?? "CUSTOMER";
+}
+
+/** Resolved requester company name with fallback to the legacy `customer` block. */
+export function getRequesterCompanyName(r: GradeRequest): string {
+  return r.requester?.companyName ?? r.customer?.companyName ?? "—";
+}
+
+export function getRequesterAccountEmail(r: GradeRequest): string | null {
+  return r.requester?.accountEmail ?? r.customer?.accountEmail ?? null;
+}
+
+export function getRequesterAccountPhone(r: GradeRequest): string | null {
+  return r.requester?.accountPhone ?? r.customer?.accountPhone ?? null;
+}
+
+export async function listGradeRequests(
+  requesterType?: GradeRequestRequesterType,
+): Promise<GradeRequest[]> {
   const rows: GradeRequest[] = [];
   let page = 1;
   let totalPages = 1;
+  const typeParam = requesterType ? `&requesterType=${requesterType}` : "";
   do {
     const { data, meta } = await apiRequest<{ items: GradeRequest[] } | GradeRequest[]>(
-      `/admin/grade-requests?page=${page}&limit=100`,
+      `/admin/grade-requests?page=${page}&limit=100${typeParam}`,
     );
     const items = Array.isArray(data) ? data : (data?.items ?? []);
     rows.push(...items);

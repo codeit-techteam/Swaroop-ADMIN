@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   BellRing,
+  BookOpen,
   Building2,
   ClipboardCheck,
   CreditCard,
@@ -59,6 +60,7 @@ export const adminNav: NavSection[] = [
     items: [
       { href: "/master-data/grades", label: "Grade Master", icon: Layers },
       { href: "/grade-requests", label: "New Grade Requests", icon: FilePlus2 },
+      { href: "/tds", label: "TDS Library", icon: BookOpen },
     ],
   },
   {

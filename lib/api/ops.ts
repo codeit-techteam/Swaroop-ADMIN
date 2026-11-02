@@ -197,6 +197,7 @@ export function mapAdminOffer(row: Record<string, unknown>): Offer {
     ),
     price: num(row.basePrice),
     bulkPrice: num(row.basePrice),
+    pricingUnit: "MT",
     quantity: num(row.quantity),
     validity: iso(row.validUntil ?? row.createdAt),
     location,
@@ -210,6 +211,21 @@ export function mapAdminOffer(row: Record<string, unknown>): Offer {
     status: mapOfferStatus(String(row.status ?? "")),
     source: "Seller Web",
     updatedAt: iso(row.updatedAt ?? row.createdAt),
+    // Soft flag: material below freight/MT needs admin verification (do not auto-correct).
+    needsPriceReview: (() => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      if (typeof meta.needsPriceReview === "boolean") return meta.needsPriceReview;
+      const price = num(row.basePrice);
+      return price > 0 && price < 1250;
+    })(),
+    priceReviewReason: (() => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      if (typeof meta.priceReviewReason === "string") return meta.priceReviewReason;
+      const price = num(row.basePrice);
+      return price > 0 && price < 1250
+        ? `Material price (₹${price}/MT) is below platform freight (₹1250/MT)`
+        : undefined;
+    })(),
   };
 }
 

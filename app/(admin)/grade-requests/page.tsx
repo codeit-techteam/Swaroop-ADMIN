@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { GradeRequestActions } from "@/components/grade-requests/grade-request-actions";
@@ -11,12 +11,18 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   GRADE_REQUEST_STATUS_LABELS,
+  GRADE_REQUESTER_TYPE_LABELS,
   getGradeRequest,
   getGradeRequestDocumentUrl,
   getGradeRequestSummary,
+  getRequesterAccountEmail,
+  getRequesterAccountPhone,
+  getRequesterCompanyName,
+  getRequesterType,
   listGradeRequests,
   type GradeRequest,
   type GradeRequestDetail,
+  type GradeRequestRequesterType,
   type GradeRequestStatus,
   type GradeRequestSummary,
 } from "@/lib/api/grade-requests";
@@ -31,6 +37,51 @@ const OPEN: GradeRequestStatus[] = [
   "QUOTATION_AVAILABLE",
 ];
 
+type RequesterFilter = "ALL" | GradeRequestRequesterType;
+
+const REQUESTER_FILTERS: { value: RequesterFilter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "CUSTOMER", label: "Customer" },
+  { value: "SELLER", label: "Seller" },
+];
+
+const ACTOR_ROLE_LABELS: Record<string, string> = {
+  CUSTOMER: "Customer",
+  SELLER: "Seller",
+  ADMIN: "Admin",
+  SUPER_ADMIN: "Admin",
+  SYSTEM: "System",
+};
+
+function actorRoleLabel(role: string | null | undefined) {
+  if (!role) return "";
+  return (
+    ACTOR_ROLE_LABELS[role] ??
+    role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
+  );
+}
+
+/** "SELLER_RESPONDED" -> "Seller responded" */
+function eventTypeLabel(type: string) {
+  return type
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function RequesterBadge({ type }: { type: GradeRequestRequesterType }) {
+  return (
+    <StatusBadge
+      value={GRADE_REQUESTER_TYPE_LABELS[type]}
+      className={
+        type === "SELLER"
+          ? "border-violet-200 bg-violet-50 text-violet-700"
+          : "border-sky-200 bg-sky-50 text-sky-700"
+      }
+    />
+  );
+}
+
 export default function GradeRequestsPage() {
   const [rows, setRows] = useState<GradeRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,13 +91,18 @@ export default function GradeRequestsPage() {
   const [detail, setDetail] = useState<GradeRequestDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [summary, setSummary] = useState<GradeRequestSummary | null>(null);
+  const [requesterFilter, setRequesterFilter] =
+    useState<RequesterFilter>("ALL");
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async (mode: "initial" | "refresh") => {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
     try {
       const [nextRows, nextSummary] = await Promise.all([
-        listGradeRequests(),
+        listGradeRequests(
+          requesterFilter === "ALL" ? undefined : requesterFilter,
+        ),
         getGradeRequestSummary().catch(() => null),
       ]);
       setRows(nextRows);
@@ -60,13 +116,15 @@ export default function GradeRequestsPage() {
       if (mode === "initial") setLoadError(message);
       else toast.error(message);
     } finally {
+      hasLoaded.current = true;
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [requesterFilter]);
 
+  // Initial load, and a silent refetch whenever the requester filter changes.
   useEffect(() => {
-    void load("initial");
+    void load(hasLoaded.current ? "refresh" : "initial");
   }, [load]);
 
   // Load the full record (timeline + documents) whenever a row is opened.
@@ -144,7 +202,7 @@ export default function GradeRequestsPage() {
   return (
     <EntityWorkbench
       title="New Grade Requests"
-      description="Customers asking for a grade that is not in the catalogue. Review, ask for information, map to an existing grade or create a new (unpublished) one."
+      description="Customers and sellers can request grades that are missing from the catalogue. Review, ask for information, map to an existing grade or create a new (unpublished) one."
       kpis={kpis}
       loading={loading}
       loadingError={loadError}
@@ -152,15 +210,35 @@ export default function GradeRequestsPage() {
       selectedId={selectedId}
       onSelectedIdChange={setSelectedId}
       actions={
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={refreshing}
-          onClick={() => void load("refresh")}
-        >
-          <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
-          Refresh
-        </Button>
+        <>
+          <div
+            className="flex gap-1.5"
+            role="group"
+            aria-label="Filter by requester type"
+          >
+            {REQUESTER_FILTERS.map((item) => (
+              <Button
+                key={item.value}
+                type="button"
+                size="sm"
+                variant={requesterFilter === item.value ? "default" : "outline"}
+                disabled={refreshing}
+                onClick={() => setRequesterFilter(item.value)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={refreshing}
+            onClick={() => void load("refresh")}
+          >
+            <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        </>
       }
       rows={rows}
       getRowId={(r) => r.id}
@@ -184,10 +262,16 @@ export default function GradeRequestsPage() {
           accessor: (r) => r.manufacturer ?? "—",
         },
         {
-          key: "customer",
-          header: "Customer",
+          key: "requester",
+          header: "Requester",
           sortable: true,
-          accessor: (r) => r.customer.companyName,
+          accessor: (r) => getRequesterCompanyName(r),
+          render: (r) => (
+            <div className="flex items-center gap-2">
+              <span>{getRequesterCompanyName(r)}</span>
+              <RequesterBadge type={getRequesterType(r)} />
+            </div>
+          ),
         },
         {
           key: "qty",
@@ -214,9 +298,9 @@ export default function GradeRequestsPage() {
           render: (r) => formatRelativeTime(r.submittedAt),
         },
       ]}
-      searchPlaceholder="Search by reference, grade, manufacturer, customer"
+      searchPlaceholder="Search by reference, grade, manufacturer, requester"
       searchFn={(r, q) =>
-        `${r.referenceNumber} ${r.gradeName} ${r.manufacturer ?? ""} ${r.materialCategory} ${r.customer.companyName} ${r.contact.name}`
+        `${r.referenceNumber} ${r.gradeName} ${r.manufacturer ?? ""} ${r.materialCategory} ${getRequesterCompanyName(r)} ${getRequesterType(r)} ${r.contact.name}`
           .toLowerCase()
           .includes(q)
       }
@@ -268,14 +352,15 @@ export default function GradeRequestsPage() {
         },
       ]}
       emptyTitle="No new grade requests yet."
-      emptyDescription="When a customer requests a grade that is not in the catalogue it will appear here."
+      emptyDescription="When a customer or seller requests a grade that is not in the catalogue it will appear here."
       exportName="new-grade-requests"
       exportRow={(r) => ({
         reference: r.referenceNumber,
         grade: r.gradeName,
         manufacturer: r.manufacturer,
         materialCategory: r.materialCategory,
-        customer: r.customer.companyName,
+        requesterType: getRequesterType(r),
+        requester: getRequesterCompanyName(r),
         contact: r.contact.name,
         phone: r.contact.phone,
         quantity: `${r.quantity} ${r.unit}`,
@@ -285,7 +370,7 @@ export default function GradeRequestsPage() {
         submittedAt: r.submittedAt,
       })}
       drawerTitle={(r) => r.referenceNumber}
-      drawerDescription={(r) => `${r.gradeName} · ${r.customer.companyName}`}
+      drawerDescription={(r) => `${r.gradeName} · ${getRequesterCompanyName(r)} (${GRADE_REQUESTER_TYPE_LABELS[getRequesterType(r)]})`}
       drawerClassName="sm:max-w-xl"
       renderDetails={(r) => {
         const d = detail && detail.id === r.id ? detail : null;
@@ -338,16 +423,26 @@ export default function GradeRequestsPage() {
 
             <section>
               <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Customer
+                Requester
               </h3>
               <dl>
-                <DetailRow label="Company" value={view.customer.companyName} />
+                <DetailRow
+                  label="Type"
+                  value={<RequesterBadge type={getRequesterType(view)} />}
+                />
+                <DetailRow
+                  label="Company"
+                  value={getRequesterCompanyName(view)}
+                />
                 <DetailRow label="Contact" value={view.contact.name} />
-                <DetailRow label="Phone" value={view.contact.phone} />
+                <DetailRow
+                  label="Phone"
+                  value={view.contact.phone ?? getRequesterAccountPhone(view) ?? "—"}
+                />
                 <DetailRow
                   label="Email"
                   value={
-                    view.contact.email ?? view.customer.accountEmail ?? "—"
+                    view.contact.email ?? getRequesterAccountEmail(view) ?? "—"
                   }
                 />
               </dl>
@@ -376,7 +471,7 @@ export default function GradeRequestsPage() {
             {view.customerResponse ? (
               <section>
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Latest customer response
+                  Latest response
                 </h3>
                 <p className="whitespace-pre-wrap rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
                   {view.customerResponse}
@@ -488,7 +583,7 @@ export default function GradeRequestsPage() {
                         <p className="text-sm font-medium">
                           {e.toStatus
                             ? GRADE_REQUEST_STATUS_LABELS[e.toStatus]
-                            : e.type.replaceAll("_", " ").toLowerCase()}
+                            : eventTypeLabel(e.type)}
                           {e.internal ? (
                             <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                               INTERNAL
@@ -501,7 +596,10 @@ export default function GradeRequestsPage() {
                           </p>
                         ) : null}
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {e.actorName ?? e.actorRole} ·{" "}
+                          {e.actorName
+                            ? `${e.actorName} (${actorRoleLabel(e.actorRole)})`
+                            : actorRoleLabel(e.actorRole)}{" "}
+                          ·{" "}
                           {formatDateTime(e.createdAt)}
                         </p>
                       </li>

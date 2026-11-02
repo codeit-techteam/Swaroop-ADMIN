@@ -60,7 +60,20 @@ export default function OffersPage() {
           { key: "id", header: "Offer #", sortable: true, accessor: (r) => r.offerNumber ?? r.id },
           { key: "seller", header: "Seller", sortable: true, accessor: (r) => r.seller },
           { key: "grade", header: "Grade", accessor: (r) => r.grade },
-          { key: "price", header: "Selling Price", sortable: true, accessor: (r) => r.price, render: (r) => `₹${r.price}` },
+          {
+            key: "price",
+            header: "Selling Price / MT",
+            sortable: true,
+            accessor: (r) => r.price,
+            render: (r) => (
+              <span className="inline-flex flex-col gap-0.5">
+                <span>{`₹${r.price.toLocaleString("en-IN")} / MT`}</span>
+                {r.needsPriceReview ? (
+                  <span className="text-[11px] font-medium text-amber-700">Needs price review</span>
+                ) : null}
+              </span>
+            ),
+          },
           { key: "qty", header: "Quantity", sortable: true, accessor: (r) => r.quantity },
           { key: "validity", header: "Validity", render: (r) => formatDate(r.validity) },
           { key: "location", header: "Warehouse", accessor: (r) => r.location },
@@ -81,6 +94,11 @@ export default function OffersPage() {
         filters={[
           { label: "Draft", value: "Draft", predicate: (r) => r.status === "Draft" },
           { label: "Pending Review", value: "Pending Review", predicate: (r) => r.status === "Pending Review" },
+          {
+            label: "Needs Price Review",
+            value: "Needs Price Review",
+            predicate: (r) => Boolean(r.needsPriceReview),
+          },
           { label: "Active", value: "Active", predicate: (r) => r.status === "Active" },
           { label: "Paused", value: "Paused", predicate: (r) => r.status === "Paused" },
           { label: "Expired", value: "Expired", predicate: (r) => r.status === "Expired" },
@@ -96,8 +114,16 @@ export default function OffersPage() {
             <DetailRow label="Offer #" value={r.offerNumber ?? r.id} />
             <DetailRow label="Seller" value={r.seller} />
             <DetailRow label="Grade" value={r.grade} />
-            <DetailRow label="Selling price" value={`₹${r.price}`} />
-            <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice}`} />
+            <DetailRow label="Selling price" value={`₹${r.price.toLocaleString("en-IN")} / MT`} />
+            <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice.toLocaleString("en-IN")} / MT`} />
+            <DetailRow
+              label="Price review"
+              value={
+                r.needsPriceReview
+                  ? r.priceReviewReason ?? "Material price looks commercially unusual — verify before relying on marketplace display."
+                  : "Verified range"
+              }
+            />
             <DetailRow label="Remarks" value={r.remarks} />
             <DetailRow label="Warehouse" value={r.location} />
             <DetailRow label="Dispatch within" value={r.dispatchWindow ?? "24 Hours"} />

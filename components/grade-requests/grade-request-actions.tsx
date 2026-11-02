@@ -24,6 +24,7 @@ import {
   addGradeRequestNote,
   assignGradeRequest,
   createGradeFromRequest,
+  getRequesterType,
   mapGradeRequestToGrade,
   requestGradeRequestInfo,
   updateGradeRequestStatus,
@@ -37,6 +38,10 @@ import {
   type Grade,
   type GradeCategory,
 } from "@/types/grade";
+
+/** Lower-case noun for the person who raised the request. */
+const requesterNoun = (request: GradeRequest) =>
+  getRequesterType(request) === "SELLER" ? "seller" : "customer";
 
 type Mode = "status" | "info" | "note" | "map" | "create" | null;
 
@@ -88,6 +93,7 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
     }
   };
 
+  const who = requesterNoun(request);
   const needsReason = status !== "" && REASON_REQUIRED.includes(status);
 
   return (
@@ -160,8 +166,8 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
           <DialogHeader>
             <DialogTitle>Update status</DialogTitle>
             <DialogDescription>
-              Currently {GRADE_REQUEST_STATUS_LABELS[request.status]}. The
-              customer is notified.
+              Currently {GRADE_REQUEST_STATUS_LABELS[request.status]}. The {who}{" "}
+              is notified.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -181,7 +187,7 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
             {status ? (
               <div className="space-y-1.5">
                 <Label htmlFor="gr-status-msg">
-                  Message to customer
+                  Message to {who}
                   {needsReason ? " (required)" : " (optional)"}
                 </Label>
                 <Textarea
@@ -228,7 +234,7 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
           <DialogHeader>
             <DialogTitle>Request additional information</DialogTitle>
             <DialogDescription>
-              This message is shown to the customer in the app and by
+              This message is shown to the {who} in the app and by
               notification.
             </DialogDescription>
           </DialogHeader>
@@ -265,7 +271,7 @@ export function GradeRequestActions({ request, onChanged, onReload }: Props) {
           <DialogHeader>
             <DialogTitle>Internal note</DialogTitle>
             <DialogDescription>
-              Visible to admins only — never shown to the customer.
+              Visible to admins only — never shown to the {who}.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -427,7 +433,7 @@ function MapGradeDialog({
         <Textarea
           rows={2}
           maxLength={2000}
-          placeholder="Optional message to the customer"
+          placeholder={`Optional message to the ${requesterNoun(request)}`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
@@ -516,7 +522,7 @@ function CreateGradeDialog({
             </select>
             {request.materialCategory ? (
               <p className="text-xs text-muted-foreground">
-                Customer asked for: {request.materialCategory}
+                Requested material: {request.materialCategory}
               </p>
             ) : null}
           </div>
@@ -564,7 +570,7 @@ function CreateGradeDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Message to customer (optional)</Label>
+            <Label>Message to {requesterNoun(request)} (optional)</Label>
             <Textarea
               rows={2}
               value={message}
