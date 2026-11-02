@@ -8,6 +8,10 @@ import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TdsDocumentActions } from "@/components/tds/tds-document-actions";
+import {
+  TdsInlinePreviewCard,
+  TdsPreviewDialog,
+} from "@/components/tds/tds-preview-dialog";
 import { TdsUploadDialog } from "@/components/tds/tds-upload-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,7 +21,6 @@ import {
   TDS_SOURCE_LABELS,
   TDS_STATUS_LABELS,
   getTdsDashboard,
-  getTdsPreview,
   listAllTdsDocuments,
   listAllTdsRequests,
   syncTdsFromStorage,
@@ -79,6 +82,7 @@ export default function TdsLibraryPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replaceDoc, setReplaceDoc] = useState<TdsDocument | null>(null);
   const [fulfillRequest, setFulfillRequest] = useState<TdsRequest | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<TdsDocument | null>(null);
   const hasLoaded = useRef(false);
 
   const load = useCallback(async (mode: "initial" | "refresh") => {
@@ -113,21 +117,6 @@ export default function TdsLibraryPage() {
   const reload = useCallback(() => {
     void load("refresh");
   }, [load]);
-
-  const openPreview = async (doc: TdsDocument) => {
-    setBusyId(doc.id);
-    try {
-      const preview = await getTdsPreview(doc.id);
-      if (preview.url) window.open(preview.url, "_blank", "noopener,noreferrer");
-      else toast.error("Preview URL was not issued.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to open preview",
-      );
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   const runStorageSync = async () => {
     setSyncing(true);
@@ -763,9 +752,15 @@ export default function TdsLibraryPage() {
       drawerDescription={(r) =>
         `${productLabel(r) ?? r.categoryCode} · ${r.gradeCode} · ${r.producerName}`
       }
-      drawerClassName="sm:max-w-xl"
+      drawerClassName="sm:max-w-2xl"
       renderDetails={(r) => (
         <div className="space-y-4">
+          {r.hasFile ? (
+            <TdsInlinePreviewCard
+              document={r}
+              onOpenFull={() => setPreviewDoc(r)}
+            />
+          ) : null}
           <dl>
             <DetailRow
               label="Status"
@@ -877,7 +872,7 @@ export default function TdsLibraryPage() {
           busy={busyId === r.id}
           onBusy={(busy) => setBusyId(busy ? r.id : null)}
           onReload={reload}
-          onPreview={() => void openPreview(r)}
+          onPreview={() => setPreviewDoc(r)}
           onReplace={() => {
             setFulfillRequest(null);
             setReplaceDoc(r);
@@ -887,6 +882,13 @@ export default function TdsLibraryPage() {
       )}
     />
     {uploadDialog}
+    <TdsPreviewDialog
+      document={previewDoc}
+      open={Boolean(previewDoc)}
+      onOpenChange={(next) => {
+        if (!next) setPreviewDoc(null);
+      }}
+    />
     </>
   );
 }

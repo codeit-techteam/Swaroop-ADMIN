@@ -66,6 +66,14 @@ export interface GradeUsage {
   reports: number;
 }
 
+/** Catalog defaults shared with Seller listing prefill and Customer PDP fallbacks. */
+export interface GradeCatalogSpecs {
+  mfi?: string;
+  density?: string;
+  casNumber?: string;
+  defaultPackaging?: string;
+}
+
 export interface Grade {
   id: string;
   gradeCode: string;
@@ -83,11 +91,14 @@ export interface Grade {
   createdBy?: string;
   updatedBy?: string;
   usage: GradeUsage;
-  /** Source.One identity and price fields; null for manually created grades. */
+  /** Source.One identity and price fields; also settable on manual grades. */
   gradeNo: string | null;
   gradeGroup: string | null;
   manufacturer: string | null;
   fullGradeName: string | null;
+  hsnCode: string | null;
+  features: string[];
+  catalogSpecs: GradeCatalogSpecs | null;
   inTodaysDelhiPriceList: boolean;
   priceTodayRsKg: string | null;
   producerPriceRsKg: string | null;
@@ -182,6 +193,18 @@ export interface GradeInput {
   customerVisible: boolean;
   sellerVisible: boolean;
   sortOrder: number;
+  gradeGroup?: string | null;
+  gradeNo?: string | null;
+  manufacturer?: string | null;
+  fullGradeName?: string | null;
+  hsnCode?: string | null;
+  features: string[];
+  catalogSpecs: GradeCatalogSpecs;
+  /** Delhi / reference list price as decimal string in ₹/kg (null clears). */
+  priceTodayRsKg?: string | null;
+  /** Producer list price as decimal string in ₹/kg (null clears). */
+  producerPriceRsKg?: string | null;
+  producerPriceType?: string | null;
 }
 
 export interface GradeFilters {

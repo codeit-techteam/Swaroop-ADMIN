@@ -89,7 +89,7 @@ export function TdsDocumentActions({
         disabled={busy || !canPreview}
         onClick={onPreview}
       >
-        Preview
+        View TDS
       </Button>
       {onReplace ? (
         <Button

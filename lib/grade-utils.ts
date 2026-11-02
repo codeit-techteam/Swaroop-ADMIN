@@ -88,6 +88,16 @@ export function emptyGradeInput(): GradeInput {
     customerVisible: true,
     sellerVisible: true,
     sortOrder: 10,
+    gradeGroup: null,
+    gradeNo: null,
+    manufacturer: null,
+    fullGradeName: null,
+    hsnCode: null,
+    features: [],
+    catalogSpecs: {},
+    priceTodayRsKg: null,
+    producerPriceRsKg: null,
+    producerPriceType: null,
   };
 }
 
@@ -102,6 +112,16 @@ export function gradeToInput(grade: Grade): GradeInput {
     customerVisible: grade.customerVisible,
     sellerVisible: grade.sellerVisible,
     sortOrder: grade.sortOrder,
+    gradeGroup: grade.gradeGroup,
+    gradeNo: grade.gradeNo,
+    manufacturer: grade.manufacturer,
+    fullGradeName: grade.fullGradeName,
+    hsnCode: grade.hsnCode,
+    features: [...(grade.features ?? [])],
+    catalogSpecs: { ...(grade.catalogSpecs ?? {}) },
+    priceTodayRsKg: grade.priceTodayRsKg,
+    producerPriceRsKg: grade.producerPriceRsKg,
+    producerPriceType: grade.producerPriceType,
   };
 }
 
@@ -110,6 +130,15 @@ export interface GradeFormErrors {
   gradeName?: string;
   categoryId?: string;
   sortOrder?: string;
+  priceTodayRsKg?: string;
+  producerPriceRsKg?: string;
+}
+
+function validateOptionalRsKg(raw: string | null | undefined): string | undefined {
+  if (raw == null || String(raw).trim() === "") return undefined;
+  const n = Number(String(raw).replace(/,/g, "").trim());
+  if (!Number.isFinite(n) || n < 0) return "Enter a valid ₹ amount (0 or greater).";
+  return undefined;
 }
 
 export function validateGradeInput(input: GradeInput): GradeFormErrors {
@@ -120,6 +149,10 @@ export function validateGradeInput(input: GradeInput): GradeFormErrors {
   if (!Number.isFinite(input.sortOrder) || input.sortOrder < 0) {
     errors.sortOrder = "Sort order must be 0 or greater.";
   }
+  const todayErr = validateOptionalRsKg(input.priceTodayRsKg);
+  if (todayErr) errors.priceTodayRsKg = todayErr;
+  const producerErr = validateOptionalRsKg(input.producerPriceRsKg);
+  if (producerErr) errors.producerPriceRsKg = producerErr;
   return errors;
 }
 
@@ -164,6 +197,9 @@ export function diffGradeFields(before: Grade, after: Grade): Array<Pick<GradeAu
     ["Customer Visible", before.customerVisible ? "YES" : "NO", after.customerVisible ? "YES" : "NO"],
     ["Seller Visible", before.sellerVisible ? "YES" : "NO", after.sellerVisible ? "YES" : "NO"],
     ["Sort Order", String(before.sortOrder), String(after.sortOrder)],
+    ["Price Today (₹/kg)", before.priceTodayRsKg ?? "", after.priceTodayRsKg ?? ""],
+    ["Producer Price (₹/kg)", before.producerPriceRsKg ?? "", after.producerPriceRsKg ?? ""],
+    ["Producer Price Type", before.producerPriceType ?? "", after.producerPriceType ?? ""],
   ];
   return pairs
     .filter(([, oldValue, newValue]) => oldValue !== newValue)

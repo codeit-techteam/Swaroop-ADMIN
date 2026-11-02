@@ -344,9 +344,14 @@ export type AdminProductOption = {
   gradeCode: string | null;
 };
 
-/** Product picker for TDS upload — searches admin products by name/code. */
+/** Product picker for TDS upload — searches name/code/gradeNo/producer (filename-friendly). */
 export async function searchProductsForTds(query: string, limit = 20) {
-  const q = query.trim();
+  const q = query
+    .trim()
+    .replace(/\.(pdf|png|jpe?g|webp)$/i, "")
+    .replace(/[_\-/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const { data } = await apiRequest<
     Array<{
       id: string;
@@ -355,7 +360,14 @@ export async function searchProductsForTds(query: string, limit = 20) {
       manufacturer?: string | null;
       brand?: string | null;
       gradeId?: string | null;
-      grade?: { id?: string; name?: string; code?: string; displayName?: string | null } | null;
+      grade?: {
+        id?: string;
+        name?: string;
+        code?: string;
+        displayName?: string | null;
+        gradeNo?: string | null;
+        manufacturer?: string | null;
+      } | null;
     }>
   >(
     `/admin/products${buildQuery({
@@ -369,10 +381,15 @@ export async function searchProductsForTds(query: string, limit = 20) {
       id: p.id,
       name: p.name,
       code: p.code,
-      manufacturer: p.manufacturer ?? p.brand ?? null,
+      manufacturer:
+        p.manufacturer ?? p.brand ?? p.grade?.manufacturer ?? null,
       gradeId: p.gradeId ?? p.grade?.id ?? null,
-      gradeName: p.grade?.displayName ?? p.grade?.name ?? null,
-      gradeCode: p.grade?.code ?? null,
+      gradeName:
+        p.grade?.displayName ??
+        p.grade?.name ??
+        p.grade?.gradeNo ??
+        null,
+      gradeCode: p.grade?.code ?? p.grade?.gradeNo ?? null,
     }),
   );
 }

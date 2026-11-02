@@ -18,6 +18,7 @@ import { GradeTable } from "@/components/grades/grade-table";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { ErrorState } from "@/components/shared/states";
+import { TdsUploadDialog } from "@/components/tds/tds-upload-dialog";
 import { Button } from "@/components/ui/button";
 import { downloadCsv, downloadExcel } from "@/lib/csv";
 import { GradeServiceError, listAllGrades } from "@/lib/api/grades";
@@ -98,6 +99,7 @@ export function GradeMasterPage() {
   const [pendingStatus, setPendingStatus] = useState<Grade | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Grade | null>(null);
   const [pendingBulk, setPendingBulk] = useState<GradeBulkAction | null>(null);
+  const [tdsUploadGrade, setTdsUploadGrade] = useState<Grade | null>(null);
   const [pendingCodeChange, setPendingCodeChange] = useState<GradeInput | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -145,8 +147,9 @@ export function GradeMasterPage() {
   async function handleCreate(values: GradeInput) {
     try {
       const created = await addGrade(values);
-      toast.success("Grade created successfully.");
+      toast.success("Grade created successfully. You can upload a TDS next.");
       setSelectedGrade(created.id);
+      setTdsUploadGrade(created);
     } catch (error) {
       toast.error(error instanceof GradeServiceError ? error.message : "Unable to save grade.");
     }
@@ -297,6 +300,26 @@ export function GradeMasterPage() {
           setDetailsOpen(false);
           setSelectedGrade(grade.id);
           setEditOpen(true);
+        }}
+      />
+      <TdsUploadDialog
+        open={Boolean(tdsUploadGrade)}
+        onOpenChange={(open) => {
+          if (!open) setTdsUploadGrade(null);
+        }}
+        presetGrade={
+          tdsUploadGrade
+            ? {
+                gradeId: tdsUploadGrade.id,
+                gradeName: tdsUploadGrade.gradeName,
+                gradeCode: tdsUploadGrade.gradeCode,
+                manufacturer: tdsUploadGrade.manufacturer,
+              }
+            : null
+        }
+        onDone={() => {
+          toast.success("TDS uploaded for the new grade.");
+          setTdsUploadGrade(null);
         }}
       />
       <GradeImportDialog

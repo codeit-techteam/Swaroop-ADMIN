@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { EditOfferPriceDialog } from "@/components/offers/edit-offer-price-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
@@ -10,11 +11,13 @@ import { SourceBadge } from "@/components/shared/source-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
+import { formatInr, kgFromMt } from "@/lib/price-units";
 import {
   approveAdminOffer,
   listAdminOffers,
   rejectAdminOffer,
   suspendAdminOffer,
+  updateAdminOfferPrice,
 } from "@/lib/api/ops";
 import { useAuthStore } from "@/store/auth-store";
 import { useDataStore } from "@/store/data-store";
@@ -26,6 +29,7 @@ export default function OffersPage() {
   const pushAudit = useDataStore((s) => s.pushAudit);
   const user = useAuthStore((s) => s.user);
   const [pending, setPending] = useState<{ id: string; status: Offer["status"] } | null>(null);
+  const [priceOffer, setPriceOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -114,8 +118,11 @@ export default function OffersPage() {
             <DetailRow label="Offer #" value={r.offerNumber ?? r.id} />
             <DetailRow label="Seller" value={r.seller} />
             <DetailRow label="Grade" value={r.grade} />
-            <DetailRow label="Selling price" value={`₹${r.price.toLocaleString("en-IN")} / MT`} />
-            <DetailRow label="Bulk selling price" value={`₹${r.bulkPrice.toLocaleString("en-IN")} / MT`} />
+            <DetailRow
+              label="Selling price"
+              value={`₹${formatInr(r.price, 0)} / MT · ₹${formatInr(kgFromMt(r.price), 4)} / kg`}
+            />
+            <DetailRow label="Bulk selling price" value={`₹${formatInr(r.bulkPrice, 0)} / MT`} />
             <DetailRow
               label="Price review"
               value={
@@ -123,6 +130,10 @@ export default function OffersPage() {
                   ? r.priceReviewReason ?? "Material price looks commercially unusual — verify before relying on marketplace display."
                   : "Verified range"
               }
+            />
+            <DetailRow
+              label="Checkout note"
+              value="Order total = material + freight (~₹1,250/MT) + GST. A ₹10/MT listing makes freight dominate (e.g. ~₹14,862 for 10 MT)."
             />
             <DetailRow label="Remarks" value={r.remarks} />
             <DetailRow label="Warehouse" value={r.location} />
@@ -134,12 +145,52 @@ export default function OffersPage() {
         )}
         drawerFooter={(r) => (
           <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" onClick={() => setPriceOffer(r)}>
+              Edit price / MT
+            </Button>
             <Button size="sm" onClick={() => setPending({ id: r.id, status: "Active" })}>Approve / Activate</Button>
             <Button size="sm" variant="destructive" onClick={() => setPending({ id: r.id, status: "Rejected" })}>Reject</Button>
             <Button size="sm" variant="outline" onClick={() => setPending({ id: r.id, status: "Paused" })}>Pause</Button>
-            <Button size="sm" variant="outline" onClick={() => setPending({ id: r.id, status: "Pending Review" })}>Request Revision</Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="col-span-2"
+              onClick={() => setPending({ id: r.id, status: "Pending Review" })}
+            >
+              Request Revision
+            </Button>
           </div>
         )}
+      />
+      <EditOfferPriceDialog
+        open={Boolean(priceOffer)}
+        offer={priceOffer}
+        onOpenChange={(open) => !open && setPriceOffer(null)}
+        onSubmit={async (input) => {
+          if (!priceOffer) return;
+          try {
+            const updated = await updateAdminOfferPrice(priceOffer.id, input);
+            updateOffer(priceOffer.id, {
+              price: updated.price,
+              bulkPrice: updated.bulkPrice,
+              needsPriceReview: updated.needsPriceReview,
+              priceReviewReason: updated.priceReviewReason,
+            });
+            pushAudit({
+              admin: user?.name ?? "Admin",
+              role: user?.role ?? "ADMIN",
+              action: `Updated offer ${priceOffer.offerNumber ?? priceOffer.id} price to ₹${updated.price}/MT`,
+              module: "Offers",
+              entity: priceOffer.id,
+              result: "Success",
+            });
+            toast.success("Material price updated");
+            await load();
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to update price.");
+            throw error;
+          }
+        }}
       />
       <ConfirmDialog
         open={Boolean(pending)}

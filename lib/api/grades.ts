@@ -44,10 +44,19 @@ type BackendGrade = {
     parentGroup?: string;
   } | null;
   applications?: Array<{ id: string; code: string; name: string }>;
+  applicationNames?: string[];
   gradeNo?: string | null;
   gradeGroup?: string | null;
   manufacturer?: string | null;
   fullGradeName?: string | null;
+  hsnCode?: string | null;
+  features?: string[];
+  catalogSpecs?: {
+    mfi?: string;
+    density?: string;
+    casNumber?: string;
+    defaultPackaging?: string;
+  } | null;
   inTodaysDelhiPriceList?: boolean;
   priceTodayRsKg?: string | null;
   producerPriceRsKg?: string | null;
@@ -106,6 +115,12 @@ function mapCategory(item: BackendCategory): GradeCategory {
 }
 
 function mapGrade(item: BackendGrade): Grade {
+  const linkedApps = (item.applications ?? []).map((app) => app.name);
+  const freeTextApps = item.applicationNames ?? [];
+  const applications =
+    linkedApps.length > 0
+      ? linkedApps
+      : freeTextApps.filter((name) => typeof name === "string" && name.trim());
   return {
     id: item.id,
     gradeCode: item.code,
@@ -113,7 +128,7 @@ function mapGrade(item: BackendGrade): Grade {
     categoryId: item.category?.id ?? "",
     categoryName: item.category?.name ?? item.category?.code ?? "",
     description: item.description ?? undefined,
-    applications: (item.applications ?? []).map((app) => app.name),
+    applications,
     status: item.status,
     customerVisible: item.customerVisible,
     sellerVisible: item.sellerVisible,
@@ -127,6 +142,9 @@ function mapGrade(item: BackendGrade): Grade {
     gradeGroup: item.gradeGroup ?? null,
     manufacturer: item.manufacturer ?? null,
     fullGradeName: item.fullGradeName ?? null,
+    hsnCode: item.hsnCode ?? null,
+    features: item.features ?? [],
+    catalogSpecs: item.catalogSpecs ?? null,
     inTodaysDelhiPriceList: Boolean(item.inTodaysDelhiPriceList),
     priceTodayRsKg: item.priceTodayRsKg ?? null,
     producerPriceRsKg: item.producerPriceRsKg ?? null,
@@ -246,8 +264,28 @@ export async function getGradeById(id: string): Promise<Grade> {
   }
 }
 
-function toCreateBody(input: GradeInput) {
+function cleanOptionalText(value?: string | null) {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function catalogSpecsBody(specs: GradeInput["catalogSpecs"]) {
+  const mfi = cleanOptionalText(specs?.mfi ?? null);
+  const density = cleanOptionalText(specs?.density ?? null);
+  const casNumber = cleanOptionalText(specs?.casNumber ?? null);
+  const defaultPackaging = cleanOptionalText(specs?.defaultPackaging ?? null);
+  if (!mfi && !density && !casNumber && !defaultPackaging) return null;
   return {
+    ...(mfi ? { mfi } : {}),
+    ...(density ? { density } : {}),
+    ...(casNumber ? { casNumber } : {}),
+    ...(defaultPackaging ? { defaultPackaging } : {}),
+  };
+}
+
+function toCreateBody(input: GradeInput) {
+  const body: Record<string, unknown> = {
     code: input.gradeCode,
     name: input.gradeName,
     displayName: input.gradeName,
@@ -258,7 +296,30 @@ function toCreateBody(input: GradeInput) {
     customerVisible: input.customerVisible,
     sellerVisible: input.sellerVisible,
     sortOrder: input.sortOrder,
+    gradeGroup: cleanOptionalText(input.gradeGroup),
+    gradeNo: cleanOptionalText(input.gradeNo),
+    manufacturer: cleanOptionalText(input.manufacturer),
+    fullGradeName: cleanOptionalText(input.fullGradeName),
+    hsnCode: cleanOptionalText(input.hsnCode),
+    features: input.features ?? [],
+    catalogSpecs: catalogSpecsBody(input.catalogSpecs),
   };
+  if (input.priceTodayRsKg !== undefined) {
+    body.priceTodayRsKg =
+      input.priceTodayRsKg == null || String(input.priceTodayRsKg).trim() === ""
+        ? null
+        : Number(String(input.priceTodayRsKg).replace(/,/g, ""));
+  }
+  if (input.producerPriceRsKg !== undefined) {
+    body.producerPriceRsKg =
+      input.producerPriceRsKg == null || String(input.producerPriceRsKg).trim() === ""
+        ? null
+        : Number(String(input.producerPriceRsKg).replace(/,/g, ""));
+  }
+  if (input.producerPriceType !== undefined) {
+    body.producerPriceType = input.producerPriceType?.trim() || null;
+  }
+  return body;
 }
 
 export async function createGrade(input: GradeInput): Promise<Grade> {
@@ -295,6 +356,32 @@ export async function updateGrade(id: string, input: Partial<GradeInput>, before
     if (changed("customerVisible")) body.customerVisible = input.customerVisible;
     if (changed("sellerVisible")) body.sellerVisible = input.sellerVisible;
     if (changed("sortOrder")) body.sortOrder = input.sortOrder;
+    if (changed("gradeGroup") && !imported) body.gradeGroup = cleanOptionalText(input.gradeGroup);
+    if (changed("gradeNo") && !imported) body.gradeNo = cleanOptionalText(input.gradeNo);
+    if (changed("manufacturer") && !imported) {
+      body.manufacturer = cleanOptionalText(input.manufacturer);
+    }
+    if (changed("fullGradeName") && !imported) {
+      body.fullGradeName = cleanOptionalText(input.fullGradeName);
+    }
+    if (changed("hsnCode")) body.hsnCode = cleanOptionalText(input.hsnCode);
+    if (changed("features")) body.features = input.features ?? [];
+    if (changed("catalogSpecs")) body.catalogSpecs = catalogSpecsBody(input.catalogSpecs ?? {});
+    if (changed("priceTodayRsKg")) {
+      body.priceTodayRsKg =
+        input.priceTodayRsKg == null || String(input.priceTodayRsKg).trim() === ""
+          ? null
+          : Number(String(input.priceTodayRsKg).replace(/,/g, ""));
+    }
+    if (changed("producerPriceRsKg")) {
+      body.producerPriceRsKg =
+        input.producerPriceRsKg == null || String(input.producerPriceRsKg).trim() === ""
+          ? null
+          : Number(String(input.producerPriceRsKg).replace(/,/g, ""));
+    }
+    if (changed("producerPriceType")) {
+      body.producerPriceType = input.producerPriceType?.trim() || null;
+    }
     const { data } = await apiRequest<BackendGrade>(`/admin/grades/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),

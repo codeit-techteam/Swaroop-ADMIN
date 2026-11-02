@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { PriceUnitField } from "@/components/shared/price-unit-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,13 @@ import {
   type GradeFormErrors,
 } from "@/lib/grade-utils";
 import { getLiveCategories } from "@/lib/grade-utils";
+import {
+  kgFromMt,
+  mtFromKg,
+  parsePriceInput,
+  toPricePerKg,
+  type PriceUnit,
+} from "@/lib/price-units";
 import { cn } from "@/lib/utils";
 import type { Grade, GradeInput, GradeStatus } from "@/types/grade";
 
@@ -57,6 +65,10 @@ export function GradeForm({
   const [saving, setSaving] = useState(false);
   const [codeLocked, setCodeLocked] = useState(mode === "edit");
   const [appDraft, setAppDraft] = useState("");
+  const [featureDraft, setFeatureDraft] = useState("");
+  const [priceUnit, setPriceUnit] = useState<PriceUnit>("KG");
+  const [priceTodayDisplay, setPriceTodayDisplay] = useState("");
+  const [producerPriceDisplay, setProducerPriceDisplay] = useState("");
   const imported = mode === "edit" && Boolean(grade?.source);
 
   useEffect(() => {
@@ -65,16 +77,60 @@ export function GradeForm({
       setValues(gradeToInput(grade));
       setCodeLocked(true);
       setAppDraft("");
+      setFeatureDraft("");
+      setPriceUnit("KG");
+      setPriceTodayDisplay(grade.priceTodayRsKg ?? "");
+      setProducerPriceDisplay(grade.producerPriceRsKg ?? "");
     } else if (mode === "create") {
       setValues(emptyGradeInput());
       setCodeLocked(false);
       setAppDraft("");
+      setFeatureDraft("");
+      setPriceUnit("KG");
+      setPriceTodayDisplay("");
+      setProducerPriceDisplay("");
     }
     setErrors({});
   }, [open, mode, grade, variant]);
 
   function patch(partial: Partial<GradeInput>) {
     setValues((current) => ({ ...current, ...partial }));
+  }
+
+  function syncPriceToday(display: string, unit: PriceUnit) {
+    setPriceTodayDisplay(display);
+    const amount = parsePriceInput(display);
+    patch({
+      priceTodayRsKg:
+        amount == null ? (display.trim() === "" ? null : values.priceTodayRsKg) : String(toPricePerKg(amount, unit)),
+    });
+  }
+
+  function syncProducerPrice(display: string, unit: PriceUnit) {
+    setProducerPriceDisplay(display);
+    const amount = parsePriceInput(display);
+    patch({
+      producerPriceRsKg:
+        amount == null
+          ? display.trim() === ""
+            ? null
+            : values.producerPriceRsKg
+          : String(toPricePerKg(amount, unit)),
+    });
+  }
+
+  function switchPriceUnit(next: PriceUnit) {
+    if (next === priceUnit) return;
+    const convert = (raw: string) => {
+      const amount = parsePriceInput(raw);
+      if (amount == null) return raw;
+      // Current display is in `priceUnit`; convert number into `next`.
+      const asKg = priceUnit === "KG" ? amount : kgFromMt(amount);
+      return String(next === "KG" ? asKg : mtFromKg(asKg));
+    };
+    setPriceTodayDisplay((current) => convert(current));
+    setProducerPriceDisplay((current) => convert(current));
+    setPriceUnit(next);
   }
 
   function addApplications(raw: string) {
@@ -84,12 +140,38 @@ export function GradeForm({
     setAppDraft("");
   }
 
+  function addFeatures(raw: string) {
+    const next = parseApplications(raw);
+    if (next.length === 0) return;
+    patch({ features: Array.from(new Set([...(values.features ?? []), ...next])) });
+    setFeatureDraft("");
+  }
+
+  function patchCatalog(partial: Partial<GradeInput["catalogSpecs"]>) {
+    patch({ catalogSpecs: { ...(values.catalogSpecs ?? {}), ...partial } });
+  }
+
   async function submit() {
+    const todayAmount = parsePriceInput(priceTodayDisplay);
+    const producerAmount = parsePriceInput(producerPriceDisplay);
     const normalized: GradeInput = {
       ...values,
       gradeCode: imported ? values.gradeCode : normalizeGradeCode(values.gradeCode),
       gradeName: values.gradeName.trim(),
       applications: values.applications,
+      priceTodayRsKg:
+        priceTodayDisplay.trim() === ""
+          ? null
+          : todayAmount == null
+            ? values.priceTodayRsKg
+            : String(toPricePerKg(todayAmount, priceUnit)),
+      producerPriceRsKg:
+        producerPriceDisplay.trim() === ""
+          ? null
+          : producerAmount == null
+            ? values.producerPriceRsKg
+            : String(toPricePerKg(producerAmount, priceUnit)),
+      producerPriceType: values.producerPriceType?.trim() || null,
     };
     const nextErrors = validateGradeInput(normalized);
     const originalCode = grade?.gradeCode;
@@ -192,6 +274,59 @@ export function GradeForm({
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="gradeGroup">Grade Group</Label>
+          <Input
+            id="gradeGroup"
+            value={values.gradeGroup ?? ""}
+            disabled={imported}
+            onChange={(event) => patch({ gradeGroup: event.target.value })}
+            placeholder="ABS EXTRUSION"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="gradeNo">Grade No.</Label>
+          <Input
+            id="gradeNo"
+            value={values.gradeNo ?? ""}
+            disabled={imported}
+            onChange={(event) => patch({ gradeNo: event.target.value })}
+            placeholder="3000D"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="manufacturer">Manufacturer</Label>
+          <Input
+            id="manufacturer"
+            value={values.manufacturer ?? ""}
+            disabled={imported}
+            onChange={(event) => patch({ manufacturer: event.target.value })}
+            placeholder="TAITA"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="hsnCode">HSN Code</Label>
+          <Input
+            id="hsnCode"
+            value={values.hsnCode ?? ""}
+            onChange={(event) => patch({ hsnCode: event.target.value })}
+            placeholder="3903.30.00"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="fullGradeName">Full Grade Name</Label>
+        <Input
+          id="fullGradeName"
+          value={values.fullGradeName ?? ""}
+          disabled={imported}
+          onChange={(event) => patch({ fullGradeName: event.target.value })}
+          placeholder="ABS EXTRUSION 3000D - TAITA"
+        />
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="description">Description</Label>
         <Textarea
@@ -201,6 +336,47 @@ export function GradeForm({
           placeholder="High-density polyethylene film grade"
           rows={3}
         />
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-slate-50/80 px-3 py-3">
+        <p className="mb-1 text-sm font-medium text-slate-900">Reference prices</p>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          Delhi / producer list rates for Grade Master. Marketplace checkout uses the
+          seller <span className="font-medium">Offer</span> selling price (₹/MT) — edit
+          that under Commerce → Offers → Edit price / MT.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PriceUnitField
+            id="priceToday"
+            label="Price Today"
+            value={priceTodayDisplay}
+            unit={priceUnit}
+            onValueChange={(v) => syncPriceToday(v, priceUnit)}
+            onUnitChange={switchPriceUnit}
+            storageUnit="KG"
+            hint="Leave blank if not on today's Delhi list."
+            error={errors.priceTodayRsKg}
+          />
+          <PriceUnitField
+            id="producerPrice"
+            label="Producer Price"
+            value={producerPriceDisplay}
+            unit={priceUnit}
+            onValueChange={(v) => syncProducerPrice(v, priceUnit)}
+            onUnitChange={switchPriceUnit}
+            storageUnit="KG"
+            error={errors.producerPriceRsKg}
+          />
+        </div>
+        <div className="mt-3 flex flex-col gap-1.5">
+          <Label htmlFor="producerPriceType">Producer price type</Label>
+          <Input
+            id="producerPriceType"
+            value={values.producerPriceType ?? ""}
+            onChange={(event) => patch({ producerPriceType: event.target.value })}
+            placeholder="LIST / CONTRACT / …"
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -229,6 +405,83 @@ export function GradeForm({
               {item} ×
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="features">Product Features</Label>
+        <Input
+          id="features"
+          value={featureDraft}
+          onChange={(event) => setFeatureDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === ",") {
+              event.preventDefault();
+              addFeatures(featureDraft);
+            }
+          }}
+          onBlur={() => addFeatures(featureDraft)}
+          placeholder="Virgin Material, IS Certified, Quality Assured"
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {(values.features ?? []).map((item) => (
+            <button
+              key={item}
+              type="button"
+              className="rounded border bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700"
+              onClick={() =>
+                patch({ features: (values.features ?? []).filter((feature) => feature !== item) })
+              }
+            >
+              {item} ×
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-slate-50/80 px-3 py-3">
+        <p className="mb-1 text-sm font-medium text-slate-900">Catalog specs</p>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          Defaults for Seller listing prefill and Customer PDP when the offer leaves them blank.
+          Seller packaging / MFI / density always win when set on the listing.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="catalogMfi">MFI</Label>
+            <Input
+              id="catalogMfi"
+              value={values.catalogSpecs?.mfi ?? ""}
+              onChange={(event) => patchCatalog({ mfi: event.target.value })}
+              placeholder="3.0"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="catalogDensity">Density</Label>
+            <Input
+              id="catalogDensity"
+              value={values.catalogSpecs?.density ?? ""}
+              onChange={(event) => patchCatalog({ density: event.target.value })}
+              placeholder="1.04"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="catalogCas">CAS Number</Label>
+            <Input
+              id="catalogCas"
+              value={values.catalogSpecs?.casNumber ?? ""}
+              onChange={(event) => patchCatalog({ casNumber: event.target.value })}
+              placeholder="9003-56-9"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="catalogPackaging">Default Packaging</Label>
+            <Input
+              id="catalogPackaging"
+              value={values.catalogSpecs?.defaultPackaging ?? ""}
+              onChange={(event) => patchCatalog({ defaultPackaging: event.target.value })}
+              placeholder="25 KG Bags"
+            />
+          </div>
         </div>
       </div>
 
@@ -286,13 +539,13 @@ export function GradeForm({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-lg">
+      <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-5 py-4 text-left">
           <SheetTitle>{mode === "create" ? "Add Grade" : "Edit Grade"}</SheetTitle>
           <SheetDescription>
             {mode === "create"
               ? "Define a tradable grade once. Customer and Seller apps consume this record."
-              : "Update display, category, visibility and status. Grade code is a stable identifier."}
+              : "Update display, reference prices (₹/MT or ₹/kg), visibility and status. Grade code is a stable identifier."}
           </SheetDescription>
         </SheetHeader>
         <div className="px-5 py-4">{fields}</div>

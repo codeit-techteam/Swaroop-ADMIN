@@ -355,6 +355,18 @@ export async function suspendAdminOffer(id: string) {
   await apiRequest(`/admin/offers/${id}/suspend`, { method: "POST", body: JSON.stringify({}) });
 }
 
+/** Correct marketplace material price (Offer.basePrice ₹/MT). Provide MT or kg. */
+export async function updateAdminOfferPrice(
+  id: string,
+  input: { pricePerMt?: number; pricePerKg?: number; reason: string },
+) {
+  const { data } = await apiRequest<Record<string, unknown>>(`/admin/offers/${id}/price`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return mapAdminOffer(data ?? {});
+}
+
 export async function listAdminOrders() {
   const rows = await listAll<Record<string, unknown>>("/admin/purchase-orders");
   return rows.map(mapAdminOrder);
