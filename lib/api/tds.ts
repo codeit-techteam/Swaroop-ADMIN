@@ -390,6 +390,9 @@ export const updateTdsRequest = (
 export type TdsStorageSyncResult = {
   prefix: string;
   autoVerify: boolean;
+  done: boolean;
+  continuationToken: string | null;
+  limit: number;
   scanned: number;
   skipped: number;
   created: number;
@@ -400,20 +403,76 @@ export type TdsStorageSyncResult = {
   sample: string[];
 };
 
-/** Scan R2 `tds/` and upsert library rows so Available matches storage. */
+type SyncProgress = {
+  chunk: number;
+  totals: Omit<
+    TdsStorageSyncResult,
+    "prefix" | "autoVerify" | "done" | "continuationToken" | "limit" | "sample"
+  >;
+};
+
+/**
+ * Scan R2 `tds/` in chunks (DO gateway kills long requests) until done.
+ * Optional onProgress for UI status while looping.
+ */
 export async function syncTdsFromStorage(input?: {
   autoVerify?: boolean;
   prefix?: string;
+  limit?: number;
+  onProgress?: (progress: SyncProgress) => void;
 }) {
-  const { data } = await apiRequest<TdsStorageSyncResult>(
-    "/admin/tds/documents/sync-storage",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        autoVerify: input?.autoVerify ?? true,
-        ...(input?.prefix ? { prefix: input.prefix } : {}),
-      }),
-    },
-  );
-  return data;
+  const totals = {
+    scanned: 0,
+    skipped: 0,
+    created: 0,
+    updated: 0,
+    verified: 0,
+    needsMapping: 0,
+    fulfilledRequests: 0,
+  };
+  let continuationToken: string | undefined;
+  let chunk = 0;
+  let last: TdsStorageSyncResult | null = null;
+
+  do {
+    chunk += 1;
+    const { data } = await apiRequest<TdsStorageSyncResult>(
+      "/admin/tds/documents/sync-storage",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          autoVerify: input?.autoVerify ?? true,
+          limit: input?.limit ?? 80,
+          ...(input?.prefix ? { prefix: input.prefix } : {}),
+          ...(continuationToken
+            ? { continuationToken }
+            : {}),
+        }),
+      },
+    );
+    last = data;
+    totals.scanned += data.scanned;
+    totals.skipped += data.skipped;
+    totals.created += data.created;
+    totals.updated += data.updated;
+    totals.verified += data.verified;
+    totals.needsMapping += data.needsMapping;
+    totals.fulfilledRequests += data.fulfilledRequests;
+    input?.onProgress?.({ chunk, totals: { ...totals } });
+    continuationToken = data.done
+      ? undefined
+      : data.continuationToken ?? undefined;
+    // Safety: never infinite-loop if API forgets to mark done.
+    if (chunk >= 500) break;
+  } while (continuationToken);
+
+  return {
+    prefix: last?.prefix ?? "tds/",
+    autoVerify: last?.autoVerify ?? true,
+    done: true,
+    continuationToken: null,
+    limit: last?.limit ?? input?.limit ?? 80,
+    ...totals,
+    sample: last?.sample ?? [],
+  } satisfies TdsStorageSyncResult;
 }

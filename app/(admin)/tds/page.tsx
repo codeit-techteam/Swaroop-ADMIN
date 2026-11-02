@@ -131,10 +131,21 @@ export default function TdsLibraryPage() {
 
   const runStorageSync = async () => {
     setSyncing(true);
+    const progressToast = toast.loading("Syncing TDS from storage…");
     try {
-      const result = await syncTdsFromStorage({ autoVerify: true });
+      const result = await syncTdsFromStorage({
+        autoVerify: true,
+        limit: 80,
+        onProgress: ({ chunk, totals }) => {
+          toast.loading(
+            `Syncing chunk ${chunk}… ${totals.created + totals.updated} linked (${totals.verified} verified)`,
+            { id: progressToast },
+          );
+        },
+      });
       toast.success(
         `Storage sync complete — ${result.created} created, ${result.updated} updated, ${result.verified} verified`,
+        { id: progressToast },
       );
       if (result.needsMapping > 0) {
         toast.message(
@@ -142,11 +153,16 @@ export default function TdsLibraryPage() {
         );
       }
       setTab("documents");
-      setDocFilter(result.needsMapping > 0 && result.verified === 0 ? "NEEDS_MAPPING" : "all");
+      setDocFilter(
+        result.needsMapping > 0 && result.verified === 0
+          ? "NEEDS_MAPPING"
+          : "VERIFIED",
+      );
       await load("refresh");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Storage sync failed",
+        { id: progressToast },
       );
     } finally {
       setSyncing(false);
