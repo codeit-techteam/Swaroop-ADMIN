@@ -10,6 +10,10 @@ export const metadata: Metadata = {
     template: "%s | PolyStoreX OS",
   },
   description: "Industrial Procurement Operating System — Admin control center",
+  icons: {
+    icon: [{ url: "/favicon.png" }, { url: "/icon.png" }],
+    apple: [{ url: "/apple-touch-icon.png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
