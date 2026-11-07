@@ -80,8 +80,8 @@ export default function WebsiteEnquiriesPage() {
 
   return (
     <EntityWorkbench
-      title="Website Enquiries"
-      description="Contact-form enquiries submitted from the public Swaroop website."
+      title="Contact Enquiries"
+      description="Contact Us submissions from polystorex.com, synchronized through the central backend."
       kpis={kpis}
       loading={loading}
       loadingError={loadError}

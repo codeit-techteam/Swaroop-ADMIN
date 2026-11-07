@@ -84,7 +84,7 @@ export const adminNav: NavSection[] = [
     items: [
       { href: "/logistics", label: "Logistics", icon: Truck },
       { href: "/support", label: "Support Tickets", icon: Headset },
-      { href: "/enquiries", label: "Website Enquiries", icon: Inbox },
+      { href: "/enquiries", label: "Contact Enquiries", icon: Inbox },
     ],
   },
   {
