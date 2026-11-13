@@ -16,7 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { APP_NAME, PORTAL_LABEL } from "@/lib/constants";
+import { PORTAL_LABEL } from "@/lib/constants";
 import { adminNav, isNavActive } from "@/lib/nav";
 import { canAccessRoute, ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -97,28 +97,30 @@ export function AdminSidebar() {
       <div className="flex h-full flex-col bg-[#0B1220] text-white">
         <div
           className={cn(
-            "flex h-14 shrink-0 items-center border-b border-white/10",
-            collapsed ? "justify-center px-2" : "gap-3 px-4",
+            "flex shrink-0 items-center border-b border-white/10",
+            collapsed ? "h-14 justify-center px-2" : "min-h-16 gap-3 px-3 py-2",
           )}
         >
-          <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+          {collapsed ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src="/brand/polystorex-logo.png"
+              src="/brand/polystorex-symbol.png"
               alt="PolyStoreX"
-              className="size-9 object-contain"
+              className="h-8 w-auto"
             />
-          </div>
-          {!collapsed ? (
+          ) : (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold leading-tight tracking-tight">
-                {APP_NAME}
-              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/polystorex-logo-transparent.png"
+                alt="PolyStoreX"
+                className="h-8 w-auto max-w-[168px]"
+              />
               <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-300/80">
                 {PORTAL_LABEL}
               </p>
             </div>
-          ) : null}
+          )}
           {!collapsed ? (
             <button
               type="button"

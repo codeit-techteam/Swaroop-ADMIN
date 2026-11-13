@@ -38,6 +38,10 @@ export function AdminHeader() {
       >
         <Menu className="size-4" />
       </Button>
+      <span className="inline-flex rounded-md bg-black p-1 lg:hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/polystorex-symbol.png" alt="PolyStoreX" className="h-6 w-auto" />
+      </span>
       <button
         type="button"
         onClick={() => setSearchOpen(true)}

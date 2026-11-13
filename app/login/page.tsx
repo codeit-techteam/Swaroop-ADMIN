@@ -115,16 +115,13 @@ export default function LoginPage() {
           className="pointer-events-none absolute -bottom-40 -left-24 size-[24rem] rounded-full bg-navy-accent/30 blur-3xl"
         />
 
-        <div className="relative flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-white/15">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/brand/polystorex-logo.png"
-              alt="PolyStoreX"
-              className="size-10 object-contain"
-            />
-          </span>
-          <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/polystorex-logo-transparent.png"
+            alt="PolyStoreX"
+            className="h-16 w-auto"
+          />
         </div>
 
         <div className="relative max-w-lg">
@@ -161,16 +158,13 @@ export default function LoginPage() {
 
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
         <div className="w-full max-w-[420px]">
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/polystorex-logo.png"
-                alt="PolyStoreX"
-                className="size-10 object-contain"
-              />
-            </span>
-            <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
+          <div className="mb-10 lg:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/polystorex-logo-light-bg.png"
+              alt="PolyStoreX"
+              className="h-14 w-auto"
+            />
           </div>
 
           <div className="rounded-2xl border border-slate-200/80 bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-12px_rgba(15,23,42,0.12)] sm:p-9">
