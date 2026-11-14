@@ -161,7 +161,7 @@ export default function LoginPage() {
           <div className="mb-10 lg:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/polystorex-logo-light-bg.png"
+              src="/brand/polystorex-logo-on-light.png"
               alt="PolyStoreX"
               className="h-14 w-auto"
             />
