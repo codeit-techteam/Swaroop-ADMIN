@@ -207,7 +207,7 @@ export function PushForm({ open, mode, notification, onOpenChange, onSave, onPre
                 <Input
                   value={values.name}
                   onChange={(e) => patch({ name: e.target.value })}
-                  placeholder="Navratri customer blast"
+                  placeholder="Grade availability update"
                 />
               </Field>
               <Field label="Category">
@@ -252,7 +252,7 @@ export function PushForm({ open, mode, notification, onOpenChange, onSave, onPre
                   value={values.title}
                   maxLength={65}
                   onChange={(e) => patch({ title: e.target.value })}
-                  placeholder="Monsoon bulk rates are live"
+                  placeholder="New grades are available"
                 />
               </Field>
               <Field label={`Body (${values.body.length}/240)`} error={errors.body} className="sm:col-span-2">

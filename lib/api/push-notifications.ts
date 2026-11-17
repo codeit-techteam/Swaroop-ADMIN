@@ -6,7 +6,10 @@ import {
   simulateDelivery,
   toPublicPayload,
 } from "@/lib/push-notification-utils";
-import { pushNotifications as seed } from "@/lib/mock-data/push-notifications";
+import {
+  isSamplePush,
+  pushNotifications as seed,
+} from "@/lib/mock-data/push-notifications";
 import { delay } from "@/lib/utils";
 import type {
   PushNotification,
@@ -16,7 +19,9 @@ import type {
   PushStatus,
 } from "@/types/push-notification";
 
-let records: PushNotification[] = structuredClone(seed);
+let records: PushNotification[] = structuredClone(seed).filter(
+  (item) => !isSamplePush(item),
+);
 
 function nextId() {
   const nums = records
@@ -216,6 +221,7 @@ export async function bulkCancel(ids: string[]): Promise<PushNotification[]> {
 export function getInboxPayloads(audience: "CUSTOMER" | "SELLER"): PushPublicPayload[] {
   promoteDueScheduled();
   return records
+    .filter((item) => !isSamplePush(item))
     .filter((item) => item.status === "SENT")
     .filter((item) => (audience === "CUSTOMER" ? hasCustomerPlatform(item.platforms) : hasSellerPlatform(item.platforms)))
     .map((item) => toPublicPayload(item, audience));

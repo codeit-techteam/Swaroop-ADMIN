@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getInboxPayloads, getPushesSync, upsertSentPush } from "@/lib/api/push-notifications";
+import { isSamplePush } from "@/lib/mock-data/push-notifications";
 import { matchesPushFilters, sortPushes, toPublicPayload } from "@/lib/push-notification-utils";
 import { EMPTY_PUSH_FILTERS, type PushNotification, type PushStatus } from "@/types/push-notification";
 
@@ -41,6 +42,9 @@ export async function POST(request: Request) {
   const item = (await request.json()) as PushNotification;
   if (!item?.id || !item.title) {
     return corsJson({ error: "Invalid push notification payload." }, 400);
+  }
+  if (isSamplePush(item)) {
+    return corsJson({ error: "Sample notifications cannot be published." }, 400);
   }
   const saved = upsertSentPush(item);
   return corsJson({ data: saved });
