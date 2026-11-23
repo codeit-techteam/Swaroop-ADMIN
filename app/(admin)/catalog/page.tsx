@@ -22,12 +22,16 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState<ProductGrade | null>(null);
+  /** Default Active-only so paused supersedes don't look like twins of live listings. */
+  const [includePaused, setIncludePaused] = useState(false);
 
-  const load = async () => {
+  const load = async (showPaused = includePaused) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const products = await listAdminProducts();
+      const products = showPaused
+        ? await listAdminProducts()
+        : await listAdminProducts({ status: "ACTIVE" });
       useDataStore.setState({ products });
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Unable to load catalog.");
@@ -38,8 +42,9 @@ export default function CatalogPage() {
   };
 
   useEffect(() => {
-    void load();
-  }, []);
+    void load(includePaused);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when pause toggle changes
+  }, [includePaused]);
 
   const kpis = useMemo(() => {
     const activeListings = rows.filter((r) => r.status === "Active").length;
@@ -64,10 +69,10 @@ export default function CatalogPage() {
     <>
       <EntityWorkbench
         title="Catalog"
-        description="Seller marketplace listings linked to Grade Master. One grade can have multiple seller listings — those are not duplicate Grade Master records. Manage material definitions in Grade Master."
+        description="Seller marketplace listings linked to Grade Master. A Grade Master row is not a listing — sellers must publish a listing (stock + offer) before it appears here or in Customer marketplace Live Listings."
         loading={loading}
         loadingError={loadError}
-        onRetry={() => void load()}
+        onRetry={() => void load(includePaused)}
         kpis={kpis}
         rows={rows}
         getRowId={(r) => r.id}
@@ -89,7 +94,7 @@ export default function CatalogPage() {
             .includes(q)
         }
         emptyTitle="No seller listings found."
-        emptyDescription="Seller products linked to Grade Master appear here. Create grades in Grade Master, then sellers publish listings against those grades."
+        emptyDescription="Grade Master entries without a published seller listing do not appear here. Sellers: My Products → Add Grade (select Grade Master, set stock ≥ MOQ, publish)."
         exportName="catalog"
         exportRow={(r) => ({
           id: r.id,
@@ -135,8 +140,21 @@ export default function CatalogPage() {
           </div>
         )}
         actions={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={includePaused ? "default" : "outline"}
+              onClick={() => setIncludePaused((prev) => !prev)}
+              disabled={loading}
+            >
+              {includePaused ? "Showing all statuses" : "Active only"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void load(includePaused)}
+              disabled={loading}
+            >
               Refresh
             </Button>
             <Button size="sm" asChild>

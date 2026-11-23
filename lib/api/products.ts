@@ -81,13 +81,23 @@ export function mapAdminProduct(item: BackendProduct): ProductGrade {
   };
 }
 
-export async function listAdminProducts(): Promise<ProductGrade[]> {
+export async function listAdminProducts(options?: {
+  /** When set, only products with this ProductStatus are returned. */
+  status?: AdminProductLifecycleStatus;
+}): Promise<ProductGrade[]> {
   const pages: ProductGrade[] = [];
   let page = 1;
   let totalPages = 1;
   do {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: "100",
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+    if (options?.status) params.set("status", options.status);
     const { data, meta } = await apiRequest<BackendProduct[]>(
-      `/admin/products?page=${page}&limit=100&sortBy=createdAt&sortOrder=desc`,
+      `/admin/products?${params.toString()}`,
     );
     pages.push(...(data ?? []).map(mapAdminProduct));
     totalPages = meta?.totalPages ?? 1;

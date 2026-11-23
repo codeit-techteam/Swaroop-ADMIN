@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Eye, EyeOff, Factory, FolderTree, IndianRupee, Layers, ToggleLeft } from "lucide-react";
+import { Eye, EyeOff, Factory, FolderTree, Layers, ToggleLeft } from "lucide-react";
 
 import { KpiCard } from "@/components/shared/kpi-card";
 import { KpiSkeleton } from "@/components/shared/states";
@@ -11,14 +11,14 @@ export function GradeKpiCards() {
   const setFilters = useGradeStore((s) => s.setFilters);
   const resetFilters = useGradeStore((s) => s.resetFilters);
 
-  if (!stats) return <KpiSkeleton count={8} />;
+  if (!stats) return <KpiSkeleton count={6} />;
 
   const lastImport = stats.lastImport?.completedAt
     ? `Last import ${new Date(stats.lastImport.completedAt).toLocaleDateString()}`
     : undefined;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <KpiCard label="Total Grades" value={String(stats.total)} hint={lastImport} icon={Layers} onClick={resetFilters} />
       <KpiCard
         label="Active Grades"
@@ -35,12 +35,6 @@ export function GradeKpiCards() {
         onClick={() => setFilters({ status: "INACTIVE" })}
       />
       <KpiCard
-        label="In Today's Delhi List"
-        value={String(stats.inTodaysDelhiPriceList)}
-        icon={IndianRupee}
-        onClick={() => setFilters({ inTodaysDelhiPriceList: "YES" })}
-      />
-      <KpiCard
         label="Customer Visible"
         value={String(stats.customerVisible)}
         icon={Eye}
@@ -53,7 +47,6 @@ export function GradeKpiCards() {
         onClick={() => setFilters({ sellerVisible: "VISIBLE" })}
       />
       <KpiCard label="Categories" value={String(stats.categories)} icon={FolderTree} />
-      <KpiCard label="Manufacturers" value={String(stats.manufacturers)} icon={Building2} />
     </div>
   );
 }
