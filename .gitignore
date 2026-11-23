@@ -71,3 +71,18 @@ artifacts/
 
 # Expo local
 .expo/
+
+# ---------------------------------------------------------------------------
+# Secrets & credentials — never commit real values
+# Keep `.env.example` tracked as the empty/placeholder template only.
+.env.production
+.env.development
+.env.staging
+secrets/
+**/secrets/**
+*.keystore
+*credentials*.json
+firebase-service-account.json
+id_rsa
+id_ed25519
+*.secret
