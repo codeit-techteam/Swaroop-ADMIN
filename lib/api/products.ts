@@ -120,3 +120,48 @@ export async function updateAdminProductStatus(
   });
   return mapAdminProduct(data);
 }
+
+export type CreateAdminListingInput = {
+  organizationId: string;
+  gradeId: string;
+  code: string;
+  name?: string;
+  manufacturer?: string;
+  mfi?: string;
+  density?: string;
+  packaging?: string;
+  unit?: string;
+  countryOfOrigin?: string;
+  application?: string;
+  polymerType?: string;
+  warehouseName?: string;
+  availableStock: number;
+  reservedStock?: number;
+  moq: number;
+  sellingPrice: number;
+  publishToMarketplace?: boolean;
+  deliveryTerms?: string;
+  dispatchWindow?: string;
+  notes?: string;
+  gstPercent?: number;
+};
+
+/** Creates product + inventory + marketplace offer for Customer App/Web Live Listings. */
+export async function createAdminListing(input: CreateAdminListingInput) {
+  const { data } = await apiRequest<
+    BackendProduct & {
+      offerId?: string;
+      inventoryId?: string;
+      warehouseId?: string;
+      published?: boolean;
+    }
+  >(`/admin/products/listings`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return {
+    product: mapAdminProduct(data),
+    offerId: data.offerId,
+    published: data.published !== false,
+  };
+}

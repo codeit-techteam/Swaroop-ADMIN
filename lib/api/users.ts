@@ -60,6 +60,8 @@ export type PermissionCatalog = {
 
 export type SellerOption = {
   id: string;
+  /** Seller organization UUID — required for Catalog Add Listing. */
+  organizationId?: string | null;
   code?: string | null;
   name: string;
   legalName?: string | null;
@@ -160,6 +162,7 @@ export async function searchSellers(
       id: string;
       status?: string;
       organization?: {
+        id?: string;
         code?: string | null;
         name?: string;
         legalName?: string | null;
@@ -170,6 +173,7 @@ export async function searchSellers(
   >(`/admin/sellers?${params.toString()}`, { signal });
   return result.data.map((row) => ({
     id: row.id,
+    organizationId: row.organization?.id ?? null,
     code: row.organization?.code ?? null,
     name: row.organization?.name ?? "Seller",
     legalName: row.organization?.legalName,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 
+import { AddListingDialog } from "@/components/catalog/add-listing-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailRow } from "@/components/shared/detail-drawer";
 import { EntityWorkbench } from "@/components/shared/entity-workbench";
@@ -22,6 +23,7 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState<ProductGrade | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   /** Default Active-only so paused supersedes don't look like twins of live listings. */
   const [includePaused, setIncludePaused] = useState(false);
 
@@ -69,7 +71,7 @@ export default function CatalogPage() {
     <>
       <EntityWorkbench
         title="Catalog"
-        description="Seller marketplace listings linked to Grade Master. A Grade Master row is not a listing — sellers must publish a listing (stock + offer) before it appears here or in Customer marketplace Live Listings."
+        description="Seller marketplace listings linked to Grade Master. Use Add Listing to publish stock + offer for a seller so the product appears here and on Customer App / Web Live Listings."
         loading={loading}
         loadingError={loadError}
         onRetry={() => void load(includePaused)}
@@ -94,7 +96,7 @@ export default function CatalogPage() {
             .includes(q)
         }
         emptyTitle="No seller listings found."
-        emptyDescription="Grade Master entries without a published seller listing do not appear here. Sellers: My Products → Add Grade (select Grade Master, set stock ≥ MOQ, publish)."
+        emptyDescription="Grade Master alone is not a listing. Use Add Listing (or Seller → Add Grade) with stock, MOQ, and a realistic ₹/MT price to publish to Customer App/Web."
         exportName="catalog"
         exportRow={(r) => ({
           id: r.id,
@@ -141,6 +143,9 @@ export default function CatalogPage() {
         )}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              Add Listing
+            </Button>
             <Button
               size="sm"
               variant={includePaused ? "default" : "outline"}
@@ -157,11 +162,26 @@ export default function CatalogPage() {
             >
               Refresh
             </Button>
-            <Button size="sm" asChild>
+            <Button size="sm" variant="outline" asChild>
               <Link href="/master-data/grades">Manage Grade Master</Link>
             </Button>
           </div>
         }
+      />
+      <AddListingDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={() => {
+          pushAudit({
+            admin: user?.name ?? "Admin",
+            role: user?.role ?? "ADMIN",
+            action: "Created marketplace listing",
+            module: "Catalog",
+            entity: "listing",
+            result: "Success",
+          });
+          void load(includePaused);
+        }}
       />
       <ConfirmDialog
         open={Boolean(pending)}
