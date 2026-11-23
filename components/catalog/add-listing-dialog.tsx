@@ -26,6 +26,18 @@ import {
 } from "@/types/grade";
 
 const MARKETPLACE_FREIGHT_FLOOR_PER_MT = 1250;
+const LIKELY_PER_KG_MAX = 500;
+
+function looksLikePerKg(price: number) {
+  return price > 0 && price <= LIKELY_PER_KG_MAX && price < MARKETPLACE_FREIGHT_FLOOR_PER_MT;
+}
+
+function normalizePricePerMt(price: number) {
+  if (looksLikePerKg(price)) {
+    return { pricePerMt: price * 1000, convertedFromPerKg: true, original: price };
+  }
+  return { pricePerMt: price, convertedFromPerKg: false, original: price };
+}
 
 function listingCodeFromGrade(grade: Grade): string {
   const base = (grade.gradeCode || grade.gradeNo || "LISTING")
@@ -129,8 +141,10 @@ export function AddListingDialog({
   const priceNum = Number(sellingPrice) || 0;
   const stockNum = Number(availableStock) || 0;
   const moqNum = Number(moq) || 0;
+  const normalizedPreview = normalizePricePerMt(priceNum);
   const priceBelowFloor =
-    priceNum > 0 && priceNum < MARKETPLACE_FREIGHT_FLOOR_PER_MT;
+    normalizedPreview.pricePerMt > 0 &&
+    normalizedPreview.pricePerMt < MARKETPLACE_FREIGHT_FLOOR_PER_MT;
 
   const canSubmit = useMemo(() => {
     if (!seller?.organizationId || !selectedGrade) return false;
@@ -167,6 +181,13 @@ export function AddListingDialog({
     if (!canSubmit || !seller?.organizationId || !selectedGrade) return;
     setSubmitting(true);
     try {
+      const normalized = normalizePricePerMt(priceNum);
+      if (normalized.convertedFromPerKg) {
+        setSellingPrice(String(normalized.pricePerMt));
+        toast.success(
+          `Converted ₹${normalized.original.toLocaleString("en-IN")}/kg → ₹${normalized.pricePerMt.toLocaleString("en-IN")}/MT`,
+        );
+      }
       const result = await createAdminListing({
         organizationId: seller.organizationId,
         gradeId: selectedGrade.id,
@@ -182,7 +203,7 @@ export function AddListingDialog({
         warehouseName: warehouseName.trim() || undefined,
         availableStock: stockNum,
         moq: moqNum,
-        sellingPrice: priceNum,
+        sellingPrice: normalized.pricePerMt,
         publishToMarketplace: publish,
         notes: notes.trim() || undefined,
         gstPercent: 18,
@@ -350,16 +371,30 @@ export function AddListingDialog({
                 onChange={(e) => setSellingPrice(e.target.value)}
               />
               {priceBelowFloor ? (
-                <p className="text-xs text-amber-700">
-                  Below platform freight (₹
-                  {MARKETPLACE_FREIGHT_FLOOR_PER_MT.toLocaleString("en-IN")}
-                  /MT). Publishing is blocked — Customer App/Web would hide this
-                  offer.
-                </p>
+                <div className="space-y-1.5">
+                  <p className="text-xs text-amber-700">
+                    {looksLikePerKg(priceNum)
+                      ? `₹${priceNum.toLocaleString("en-IN")} looks like ₹/kg. Live floor is ₹${MARKETPLACE_FREIGHT_FLOOR_PER_MT.toLocaleString("en-IN")}/MT.`
+                      : `Below platform freight (₹${MARKETPLACE_FREIGHT_FLOOR_PER_MT.toLocaleString("en-IN")}/MT).`}
+                  </p>
+                  {looksLikePerKg(priceNum) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() =>
+                        setSellingPrice(String(priceNum * 1000))
+                      }
+                    >
+                      Convert to ₹{(priceNum * 1000).toLocaleString("en-IN")}/MT
+                    </Button>
+                  ) : null}
+                </div>
               ) : (
                 <p className="text-xs text-slate-500">
-                  Use a realistic polymer ₹/MT (e.g. 90,000+), not a test amount
-                  like ₹140.
+                  Enter ₹/MT (e.g. ₹90/kg → ₹90,000/MT). Live floor ₹
+                  {MARKETPLACE_FREIGHT_FLOOR_PER_MT.toLocaleString("en-IN")}/MT.
                 </p>
               )}
             </div>
