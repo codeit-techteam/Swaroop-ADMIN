@@ -211,15 +211,21 @@ export function mapAdminOffer(row: Record<string, unknown>): Offer {
     status: mapOfferStatus(String(row.status ?? "")),
     source: "Seller Web",
     updatedAt: iso(row.updatedAt ?? row.createdAt),
-    // Soft flag: material below freight/MT needs admin verification (do not auto-correct).
+    // Active means admin (or a realistic seller price) already cleared review.
+    // Do not keep "Needs price review" on approved rows such as HD Film SKR.
     needsPriceReview: (() => {
+      const status = mapOfferStatus(String(row.status ?? ""));
+      if (status === "Active") return false;
       const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      if (meta.adminPriceApproved === true) return false;
       if (typeof meta.needsPriceReview === "boolean") return meta.needsPriceReview;
       const price = num(row.basePrice);
       return price > 0 && price < 1250;
     })(),
     priceReviewReason: (() => {
+      const status = mapOfferStatus(String(row.status ?? ""));
       const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      if (status === "Active" || meta.adminPriceApproved === true) return undefined;
       if (typeof meta.priceReviewReason === "string") return meta.priceReviewReason;
       const price = num(row.basePrice);
       return price > 0 && price < 1250

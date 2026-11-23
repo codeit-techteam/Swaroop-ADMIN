@@ -72,7 +72,9 @@ export default function OffersPage() {
             render: (r) => (
               <span className="inline-flex flex-col gap-0.5">
                 <span>{`₹${r.price.toLocaleString("en-IN")} / MT`}</span>
-                {r.needsPriceReview ? (
+                {r.status === "Active" ? (
+                  <span className="text-[11px] font-medium text-emerald-700">Approved · live</span>
+                ) : r.needsPriceReview ? (
                   <span className="text-[11px] font-medium text-amber-700">Needs price review</span>
                 ) : null}
               </span>
@@ -126,9 +128,11 @@ export default function OffersPage() {
             <DetailRow
               label="Price review"
               value={
-                r.needsPriceReview
-                  ? r.priceReviewReason ?? "Material price looks commercially unusual — verify before relying on marketplace display."
-                  : "Verified range"
+                r.status === "Active"
+                  ? "Approved — visible on Customer App and Web"
+                  : r.needsPriceReview
+                    ? r.priceReviewReason ?? "Material price looks commercially unusual — approve to publish it on the marketplace."
+                    : "Verified range"
               }
             />
             <DetailRow
@@ -195,8 +199,12 @@ export default function OffersPage() {
       <ConfirmDialog
         open={Boolean(pending)}
         onOpenChange={(open) => !open && setPending(null)}
-        title="Update offer"
-        description="Offer status changes are Admin Portal actions and are written to the audit log."
+        title={pending?.status === "Active" ? "Approve offer" : "Update offer"}
+        description={
+          pending?.status === "Active"
+            ? "Approving clears Needs price review and publishes this offer on the Customer App and Web marketplace. An expired validity is extended 30 days."
+            : "Offer status changes are Admin Portal actions and are written to the audit log."
+        }
         destructive={pending?.status === "Rejected"}
         onConfirm={async () => {
           if (!pending) return;
@@ -204,9 +212,18 @@ export default function OffersPage() {
             if (pending.status === "Active") await approveAdminOffer(pending.id);
             else if (pending.status === "Rejected") await rejectAdminOffer(pending.id);
             else if (pending.status === "Paused") await suspendAdminOffer(pending.id);
-            updateOffer(pending.id, { status: pending.status });
+            updateOffer(pending.id, {
+              status: pending.status,
+              ...(pending.status === "Active"
+                ? { needsPriceReview: false, priceReviewReason: undefined }
+                : {}),
+            });
             pushAudit({ admin: user?.name ?? "Admin", role: user?.role ?? "ADMIN", action: `Set offer ${pending.id} to ${pending.status}`, module: "Offers", entity: pending.id, result: "Success" });
-            toast.success("Offer updated");
+            toast.success(
+              pending.status === "Active"
+                ? "Offer approved — live on Customer App and Web"
+                : "Offer updated",
+            );
             await load();
           } catch (error) {
             toast.error(error instanceof Error ? error.message : "Unable to update offer.");
