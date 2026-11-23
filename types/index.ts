@@ -90,17 +90,25 @@ export interface PlatformUser {
 /** Catalog inventory snapshot. Canonical tradable identity lives in Grade Master — see `types/grade.ts`. */
 export interface ProductGrade {
   id: string;
+  /** Seller product / SKU id. */
+  productCode?: string;
+  /** Canonical Grade Master id when known. */
+  gradeId?: string;
   grade: string;
   commodity: string;
   manufacturer: string;
   brand: string;
   specification: string;
   location: string;
+  /** Seller organization display name (Catalog lists seller Products, not Grade Master rows). */
+  sellerName?: string;
   availableQty: number;
   activeSellers: number;
   activeOffers: number;
   inventory: number;
   status: EntityStatus;
+  /** Backend ProductStatus for activate/deactivate. */
+  productStatus?: string;
 }
 
 export interface Offer {
